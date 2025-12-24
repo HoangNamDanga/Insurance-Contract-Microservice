@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: conhungngay-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+
+      # ===== MONGODB =====
+      - MongoDBSettings__ConnectionString=mongodb://mongodb:27017
+      - MongoDBSettings__DatabaseName=InsuranceDB
+      - MongoDBSettings__CustomerCollectionName=Customer
+
+      # ===== ORACLE =====
+      - ConnectionStrings__OracleDbConnection=User Id=INSURANCE_USER;Password=mypassword123;Data Source=oracle:1521/XEPDB1 #dùng oracle thay vì localhost? Vì trong mạng Docker (networks: backend), các container gọi nhau bằng Tên Service.
+
+      # ===== RABBITMQ =====
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+
+    networks:
+      - backend
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - backend
+
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle
+    restart: always
+    ports:
+      - "1522:1521"
+    environment:
+      - ORACLE_PASSWORD=mypassword123
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo \"SELECT 1 FROM DUAL;\" | sqlplus -s system/mypassword123@//localhost:1521/XEPDB1"
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  oracle_data:

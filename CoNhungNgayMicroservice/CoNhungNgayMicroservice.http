@@ -1,0 +1,6 @@
+@CoNhungNgayMicroservice_HostAddress = http://localhost:5058
+
+GET {{CoNhungNgayMicroservice_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

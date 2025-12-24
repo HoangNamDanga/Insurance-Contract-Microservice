@@ -1,0 +1,13 @@
+# Visual Studio files
+.vs/
+bin/
+obj/
+*.user
+*.suo
+
+# Docker
+.dockerignore
+
+# OS files
+Thumbs.db
+desktop.ini

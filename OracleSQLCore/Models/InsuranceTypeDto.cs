@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace OracleSQLCore.Models
+{
+    public class InsuranceTypeDto
+    {
+        public int InsTypeId { get; set; }
+        public string TypeName { get; set; }
+        public string Description { get; set; }
+    }
+}

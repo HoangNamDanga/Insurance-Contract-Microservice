@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoNhungNgayMicroservice", "CoNhungNgayMicroservice\CoNhungNgayMicroservice.csproj", "{216E7F35-094E-49F8-A7D4-B1B4BF75CA70}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OracleSQLCore", "OracleSQLCore\OracleSQLCore.csproj", "{5C332261-62AB-47BA-B7D4-5287A1D9A850}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDBCore", "MongoDBCore\MongoDBCore.csproj", "{D728E625-1546-4B11-A762-485793335374}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{216E7F35-094E-49F8-A7D4-B1B4BF75CA70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{216E7F35-094E-49F8-A7D4-B1B4BF75CA70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{216E7F35-094E-49F8-A7D4-B1B4BF75CA70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{216E7F35-094E-49F8-A7D4-B1B4BF75CA70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C332261-62AB-47BA-B7D4-5287A1D9A850}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C332261-62AB-47BA-B7D4-5287A1D9A850}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C332261-62AB-47BA-B7D4-5287A1D9A850}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C332261-62AB-47BA-B7D4-5287A1D9A850}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D728E625-1546-4B11-A762-485793335374}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D728E625-1546-4B11-A762-485793335374}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D728E625-1546-4B11-A762-485793335374}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D728E625-1546-4B11-A762-485793335374}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2A3D803F-AE3F-42F8-AC0F-B15E2D09C54A}
+	EndGlobalSection
+EndGlobal
