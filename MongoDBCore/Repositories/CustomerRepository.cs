@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using MongoDBCore.Entities.Models;
 using MongoDBCore.Entities.Models.DTOs;
 using MongoDBCore.Interfaces;
@@ -16,8 +17,10 @@ namespace MongoDBCore.Repositories
         private readonly IMongoCollection<Customer> _customerCollection;
 
         // Constructor: Nhận các thiết lập kết nối (MongoDBSettings)
-        public CustomerRepository(MongoDbSettings settings)
+        public CustomerRepository(IOptions<MongoDbSettings> options)
+
         {
+            var settings = options.Value;
             // Tạo MongoClient để kết nối tới MongoDB
             var mongoClient = new MongoClient(settings.ConnectionString);  // Chú ý: Đảm bảo ConnectionString là kiểu string
 

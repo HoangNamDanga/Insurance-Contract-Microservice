@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDBCore.Entities.Models.DTOs;
 using OracleSQLCore.Models;
 using OracleSQLCore.Services;
+using Polly;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -19,22 +20,27 @@ namespace CoNhungNgayMicroservice.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        [HttpPost("sync")]
 
-        //Publish message (Oracle project)
-        //flow Oracle → RabbitMQ → MongoDB
+        [HttpPost("sync")]
         public async Task<IActionResult> Create([FromBody] Customer customer, [FromServices] IPublishEndpoint publishEndpoint)
         {
-            // 1. Lưu vào Oracle
+            // 1. Lưu vào Oracle (Database nội bộ)
             var id = await _customerService.CreateCustomer(customer);
 
-            // 2. Thay vì gọi HTTP, ta bắn sự kiện vào RabbitMQ
-            //Đây là thời điểm message nằm trong Queue
-            await publishEndpoint.Publish(new CustomerSyncDto // Producer đã publish
+            // Định nghĩa Policy (Thường sẽ khai báo tập trung ở Program.cs hoặc biến static)
+            var retryPolicy = Policy
+                .Handle<Exception>() // Bắt các lỗi kết nối RabbitMQ
+                .WaitAndRetryAsync(3, i => TimeSpan.FromSeconds(2));
+
+            // 2. Polly bao bọc hành động Publish
+            await retryPolicy.ExecuteAsync(async () =>
             {
-                CustomerId = id.ToString(),
-                FullName = customer.FullName,
-                Email = customer.Email
+                await publishEndpoint.Publish(new CustomerSyncDto
+                {
+                    CustomerId = id.ToString(),
+                    FullName = customer.FullName,
+                    Email = customer.Email
+                });
             });
 
             return Ok("Đã đưa vào hàng chờ đồng bộ!");

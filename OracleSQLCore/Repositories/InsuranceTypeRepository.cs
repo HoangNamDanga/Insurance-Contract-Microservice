@@ -38,7 +38,15 @@ namespace OracleSQLCore.Repositories
             cmd.ExecuteNonQuery();
             tran.Commit();
 
-            dto.InsTypeId = Convert.ToInt32(cmd.Parameters["p_out_id"].Value);
+            // THÀNH:
+            if (cmd.Parameters["p_out_id"].Value is Oracle.ManagedDataAccess.Types.OracleDecimal oracleDecimal)
+            {
+                dto.InsTypeId = oracleDecimal.ToInt32();
+            }
+            else
+            {
+                dto.InsTypeId = Convert.ToInt32(cmd.Parameters["p_out_id"].Value);
+            }
             return dto;
         }
 
@@ -78,7 +86,7 @@ namespace OracleSQLCore.Repositories
             {
                 list.Add(new InsuranceTypeDto
                 {
-                    InsTypeId = Convert.ToInt32(reader["INS.TYPE_ID"]),
+                    InsTypeId = reader["INS_TYPE_ID"] is DBNull ? 0 : Convert.ToInt32(reader["INS_TYPE_ID"].ToString()),
                     TypeName = reader["TYPE_NAME"].ToString(),
                     Description = reader["DESCRIPTION"].ToString()
                 });

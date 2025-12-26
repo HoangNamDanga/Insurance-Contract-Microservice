@@ -16,5 +16,7 @@ namespace MongoDBCore.Entities.Models
 
         // Tên Collection (tập hợp các tài liệu) cho User
         public string CustomerCollectionName { get; set; } = null!;
+
+        public string InsuranceTypeCollectionName { get; set; } = null!;
     }
 }

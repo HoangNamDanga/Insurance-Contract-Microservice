@@ -22,7 +22,8 @@ services:
       # ===== MONGODB =====
       - MongoDBSettings__ConnectionString=mongodb://mongodb:27017
       - MongoDBSettings__DatabaseName=InsuranceDB
-      - MongoDBSettings__CustomerCollectionName=Customer
+      - MongoDBSettings__CustomerCollectionName=Customers
+      - MongoDBSettings__InsuranceTypeCollectionName=InsuranceTypes # Thêm dòng này
 
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=INSURANCE_USER;Password=mypassword123;Data Source=oracle:1521/XEPDB1 #dùng oracle thay vì localhost? Vì trong mạng Docker (networks: backend), các container gọi nhau bằng Tên Service.

@@ -16,9 +16,9 @@ namespace MongoDBCore.Entities.Models
 
         // Thuộc tính Tên đầy đủ (sử dụng BsonElement nếu tên cột khác tên thuộc tính)
         [BsonElement("Name")]
-        public string FullName { get; set; } = null!;
+        public string? FullName { get; set; } = null!;
 
-        public string Email { get; set; } = null!;
+        public string? Email { get; set; } = null!;
 
         // Thời gian tạo (sử dụng múi giờ UTC)
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]

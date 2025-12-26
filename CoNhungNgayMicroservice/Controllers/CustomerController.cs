@@ -20,7 +20,7 @@ namespace CoNhungNgayMicroservice.Controllers
         }
 
         [HttpPost("sync")]
-        public async Task<IActionResult> Create([FromBody] OracleSQLCore.Models.Customer customer)
+        public async Task<IActionResult> Create([FromBody] Customer customer)
         {
             var id = await _customerService.CreateCustomer(customer);
 
