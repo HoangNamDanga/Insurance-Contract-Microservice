@@ -1,4 +1,4 @@
-﻿using OracleSQLCore.Models;
+﻿using OracleSQLCore.Models.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

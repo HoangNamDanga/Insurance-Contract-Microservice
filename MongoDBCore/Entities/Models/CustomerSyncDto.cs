@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MongoDBCore.Entities.Models.DTOs
+namespace MongoDBCore.Entities.Models
 {
     public class CustomerSyncDto
     {

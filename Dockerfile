@@ -1,22 +1,28 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# 1. Copy solution + tất cả csproj
+# 1. Copy file Solution
 COPY CoNhungNgayMicroservice.sln ./
-COPY CoNhungNgayMicroservice/*.csproj CoNhungNgayMicroservice/
-COPY MongoDBCore/*.csproj MongoDBCore/
-COPY OracleSQLCore/*.csproj OracleSQLCore/
 
-# 2. Restore tất cả dự án (MassTransit sẽ được restore đúng scope)
+# 2. Tạo các thư mục tương ứng và Copy các file .csproj vào đúng chỗ
+# Việc này giúp lệnh 'dotnet restore' ở file .sln hoạt động chính xác
+COPY Shared.Contracts/Shared.Contracts.csproj Shared.Contracts/
+COPY CoNhungNgayMicroservice/CoNhungNgayMicroservice.csproj CoNhungNgayMicroservice/
+COPY MongoDBCore/MongoDBCore.csproj MongoDBCore/
+COPY OracleSQLCore/OracleSQLCore.csproj OracleSQLCore/
+
+# 3. Restore toàn bộ các dependencies dựa trên file .sln
 RUN dotnet restore
 
-# 3. Copy toàn bộ source code
+# 4. Copy toàn bộ mã nguồn của tất cả các project vào container
 COPY . .
 
-# 4. Build & publish project chính
+# 5. Chuyển đến thư mục dự án cần chạy và Build
 WORKDIR /src/CoNhungNgayMicroservice
 RUN dotnet publish -c Release -o /app/publish
 
-# 5. Chạy API khi container start
-WORKDIR /app/publish
+# --- Stage 2: Runtime (Giúp Image nhẹ hơn - Tùy chọn nhưng nên làm) ---
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "CoNhungNgayMicroservice.dll"]

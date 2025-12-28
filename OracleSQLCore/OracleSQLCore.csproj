@@ -18,4 +18,8 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Shared.Contracts\Shared.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

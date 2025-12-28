@@ -11,16 +11,25 @@ using Polly;
 using MassTransit;
 using MongoDBCore.Repositories.Consumer;
 using Polly.Retry;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(options => // C?u hình Swagger phân bi?t tên file trùng nhau b?ng namespace
+{
+    // Dòng này c?c k? quan tr?ng ?? s?a l?i b?n ?ang g?p
+    // Nó s? dùng Full Name (Namespace + ClassName) ?? làm ID trong Swagger
+    options.CustomSchemaIds(type => type.FullName);
+});
 
 // ===== ConnectionStrings =====
 // 1. L?y connection string t? c?u hình (appsettings ho?c Docker Env)
+
+#region ConnectionString
 var oracleConnectionString =
     builder.Configuration.GetConnectionString("OracleDbConnection");
 
@@ -39,34 +48,36 @@ if (string.IsNullOrWhiteSpace(mongoConnectionString))
 {
     throw new InvalidOperationException("MongoDbConnection is missing");
 }
+#endregion
 
+#region Oracle DI, Service + Repo
 // ===== Oracle DI =====
 //2. ??ng ký Repository vào h? th?ng DI
 // ??ng ký cho Oracle
 builder.Services.AddScoped<OracleSQLCore.Interface.ICustomerRepository>(
     _ => new OracleSQLCore.Repositories.CustomerRepository(oracleConnectionString)
 );
-// ??ng ký cho MongoDB
-builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCore.Repositories.CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
-builder.Services.AddScoped<MongoDBCore.Services.ICustomerService, MongoDBCore.Services.Imp.CustomerService>();
-
-
 builder.Services.AddScoped<OracleSQLCore.Interface.IInsuranceTypeRepository>(
     _ => new OracleSQLCore.Repositories.InsuranceTypeRepository(oracleConnectionString)
 );
 builder.Services.AddScoped<IInsuranceTypeService, InsuranceTypeService>();
+builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
+    new AgentRepository(oracleConnectionString!));
+builder.Services.AddScoped<IAgentService, AgentService>();
+#endregion
+// End
 // ??ng ký cho MongoDB
+#region MongoDb, Repo
+
+builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCore.Repositories.CustomerRepository>();
+builder.Services.AddScoped<MongoDBCore.Interfaces.IAgentRepository, MongoDBCore.Repositories.AgentRepository>();
+builder.Services.AddScoped<MongoDBCore.Services.ICustomerService, MongoDBCore.Services.Imp.CustomerService>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IInsuranceRepository, MongoDBCore.Repositories.InsuranceTypeRepository>();
-
-
-
-// ===== MongoDB DI =====
-//2. ??ng ký Repository vào h? th?ng DI
 builder.Services.AddSingleton<IMongoClient>(
     _ => new MongoClient(mongoConnectionString)
 );
-
+#endregion
 // ===== HealthChecks =====
 builder.Services.AddHealthChecks()
     .AddOracle(oracleConnectionString, name: "oracle-db")
@@ -83,10 +94,12 @@ builder.Services.AddHttpClient();
 
 
 
+#region Polly
 // C?u hình chính sách: Th? l?i 3 l?n, m?i l?n cách nhau 2 giây n?u g?p l?i m?ng ho?c l?i 5xx
 //g?n Polly vào HttpClient, hàm t?o Create controller Oracle
 // ?o?n codde này có nhi?m v? “M?i khi tôi g?i CreateClient("MongoSyncClient") thì m?i HTTP request g?i ?i s? t? ??ng có retry + circuit breaker.”
 
+#region Cách 1 áp d?ng v?i Service A ??ng b? v?i Service B bình th??ng áp d?ng c? 2 g?n vào HttpClient và sau ?ó g?i b?ng PostJson
 var retryPolicy = HttpPolicyExtensions
     .HandleTransientHttpError() // b?t l?i t?m th?i include L?i m?ng (HttpRequestException), HTTP 5xx, HTTP 408 (Timeout)
     .WaitAndRetryAsync(
@@ -105,8 +118,11 @@ builder.Services.AddHttpClient("MongoSyncClient") // // g?n polly vào client -> 
     .AddPolicyHandler(circuitBreaker); // N?u l?i nhi?u -> circuit breaker qu?n lý
 // Chú ý th? t? trong Pollyu r?t quan tr?ng. Retry tr??c -> Circuit breaker sau -> ?ây là th? t? ?úng
 
-//poly kieu 2
-// ??ng ký AsyncRetryPolicy cho h? th?ng
+#endregion
+
+
+#region Cách 2 . Áp d?ng v?i RabbitMQ ch? Retry
+//poly kieu 2 - dùng trong consumer và controlelr
 builder.Services.AddSingleton<AsyncRetryPolicy>(sp =>
 {
     return Policy
@@ -120,7 +136,11 @@ builder.Services.AddSingleton<AsyncRetryPolicy>(sp =>
             });
 });
 
+#endregion
 
+#endregion
+
+#region RabbitMQ
 //RabbitMQ
 //Bus (MassTransit bus) là n?i các consumer ??ng ký ?? nh?n message.
 //Ch? project nào có consumer m?i c?n c?u hình consumer + bus ?? nh?n message.
@@ -129,7 +149,7 @@ builder.Services.AddMassTransit(x =>
     // --- ??NG KÝ CÁC CONSUMER ---
     x.AddConsumer<CustomerCreatedConsumer>();
     x.AddConsumer<InsuranceTypeCreateConsumer>(); // Thêm dòng này cho Insurance
-
+    x.AddConsumer<AgentCreatedConsumer>(); // Thêm dòng này cho Insurance
     x.UsingRabbitMq((context, cfg) =>
     {
         cfg.Host("rabbitmq", "/", h =>
@@ -149,9 +169,14 @@ builder.Services.AddMassTransit(x =>
         {
             e.ConfigureConsumer<InsuranceTypeCreateConsumer>(context);
         });
+        // --- ENDPOINT 3: Cho Agents ---
+        cfg.ReceiveEndpoint("agent-sync-queue", e =>
+        {
+            e.ConfigureConsumer<AgentCreatedConsumer>(context);
+        });
     });
 });
-
+#endregion
 
 
 

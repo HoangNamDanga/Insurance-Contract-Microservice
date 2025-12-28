@@ -1,5 +1,4 @@
 ﻿using MongoDBCore.Entities.Models;
-using MongoDBCore.Entities.Models.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDBCore.Entities.Models;
-using MongoDBCore.Entities.Models.DTOs;
 
 namespace CoNhungNgayMicroservice.Controllers
 {

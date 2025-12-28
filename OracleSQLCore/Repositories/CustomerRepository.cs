@@ -1,7 +1,7 @@
 ﻿using Dapper;
 using Oracle.ManagedDataAccess.Client;
 using OracleSQLCore.Interface;
-using OracleSQLCore.Models;
+using OracleSQLCore.Models.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Data;

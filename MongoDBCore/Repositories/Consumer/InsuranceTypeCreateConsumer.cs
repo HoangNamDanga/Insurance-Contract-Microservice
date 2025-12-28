@@ -1,6 +1,5 @@
 ﻿using MassTransit;
 using MongoDBCore.Entities.Models;
-using MongoDBCore.Entities.Models.DTOs;
 using MongoDBCore.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -8,9 +7,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using Shared.Contracts.Events;
+
 namespace MongoDBCore.Repositories.Consumer
 {
-    public class InsuranceTypeCreateConsumer : IConsumer<MongoDBCore.Entities.Models.DTOs.InsuranceTypeEvent>
+    public class InsuranceTypeCreateConsumer : IConsumer<InsuranceTypeEvent>
     {
         private readonly IInsuranceRepository _repo;
 
@@ -19,7 +20,7 @@ namespace MongoDBCore.Repositories.Consumer
             _repo = repo;
         }
 
-        public async Task Consume(ConsumeContext<MongoDBCore.Entities.Models.DTOs.InsuranceTypeEvent> context)
+        public async Task Consume(ConsumeContext<InsuranceTypeEvent> context)
         {
             var eventData = context.Message;
 

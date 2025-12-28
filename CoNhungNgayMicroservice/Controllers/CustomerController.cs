@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using OracleSQLCore.Models;
+using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Services;
 using System.Net.Http;
 
@@ -24,7 +24,7 @@ namespace CoNhungNgayMicroservice.Controllers
         {
             var id = await _customerService.CreateCustomer(customer);
 
-            var syncData = new MongoDBCore.Entities.Models.DTOs.CustomerSyncDto
+            var syncData = new MongoDBCore.Entities.Models.CustomerSyncDto
             {
                 CustomerId = id.ToString(),
                 FullName = customer.FullName,

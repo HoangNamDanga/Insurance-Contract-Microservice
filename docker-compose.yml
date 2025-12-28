@@ -24,6 +24,7 @@ services:
       - MongoDBSettings__DatabaseName=InsuranceDB
       - MongoDBSettings__CustomerCollectionName=Customers
       - MongoDBSettings__InsuranceTypeCollectionName=InsuranceTypes # Thêm dòng này
+      - MongoDBSettings__AgentCollectionName=Agents # Thêm dòng này
 
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=INSURANCE_USER;Password=mypassword123;Data Source=oracle:1521/XEPDB1 #dùng oracle thay vì localhost? Vì trong mạng Docker (networks: backend), các container gọi nhau bằng Tên Service.
@@ -86,5 +87,5 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_data:
+  mongo_data: #Đối với Cơ sở dữ liệu (Oracle & MongoDB) -> KHÔNG MẤT khi chạy lệnh docker-compose down, nếu có -v mới mất hết
   oracle_data:

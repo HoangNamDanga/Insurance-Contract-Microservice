@@ -1,11 +1,12 @@
 ﻿using MassTransit;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using OracleSQLCore.Models;
-using OracleSQLCore.Models.DTOs;
+using MongoDBCore.Interfaces;
+using Shared.Contracts.Events;
 using OracleSQLCore.Services;
 using Polly;
 using Polly.Retry;
+using OracleSQLCore.Models.DTOs;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -16,15 +17,14 @@ namespace CoNhungNgayMicroservice.Controllers
         private readonly IInsuranceTypeService _service;
         private readonly IPublishEndpoint _publishEndpoint;
         private readonly AsyncRetryPolicy _retryPolicy;
-
-        public InsuranceTypeController(IInsuranceTypeService service, IPublishEndpoint publishEndpoint, AsyncRetryPolicy retryPolicy)
+        private readonly IInsuranceRepository _repo;
+        public InsuranceTypeController(IInsuranceTypeService service, IPublishEndpoint publishEndpoint, AsyncRetryPolicy retryPolicy, IInsuranceRepository repo)
         {
+            _repo = repo;
             _service = service;
             _publishEndpoint = publishEndpoint;
             // Định nghĩa Polly: Thử lại 3 lần nếu việc bắn tin vào RabbitMQ lỗi
-            _retryPolicy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, i => TimeSpan.FromSeconds(Math.Pow(2, i)));
+            _retryPolicy = retryPolicy;
         }
 
 
@@ -38,7 +38,7 @@ namespace CoNhungNgayMicroservice.Controllers
             // còn luồng là bất đồng bộ
             await _retryPolicy.ExecuteAsync(async () =>
             {
-                await _publishEndpoint.Publish(new MongoDBCore.Entities.Models.DTOs.InsuranceTypeEvent
+                await _publishEndpoint.Publish(new InsuranceTypeEvent
                 {
                     InsTypeId = result.InsTypeId,
                     TypeName = result.TypeName,
@@ -56,7 +56,7 @@ namespace CoNhungNgayMicroservice.Controllers
             _service.Update(dto);
             await _retryPolicy.ExecuteAsync(async () =>
             {
-                await _publishEndpoint.Publish(new MongoDBCore.Entities.Models.DTOs.InsuranceTypeEvent
+                await _publishEndpoint.Publish(new InsuranceTypeEvent
                 {
                     InsTypeId = dto.InsTypeId,
                     TypeName = dto.TypeName,
@@ -73,7 +73,7 @@ namespace CoNhungNgayMicroservice.Controllers
             _service.Delete(id);
             await _retryPolicy.ExecuteAsync(async () =>
             {
-                await _publishEndpoint.Publish(new MongoDBCore.Entities.Models.DTOs.InsuranceTypeEvent
+                await _publishEndpoint.Publish(new InsuranceTypeEvent
                 {
                     InsTypeId = id,
                     Action = "DELETE"
@@ -81,6 +81,34 @@ namespace CoNhungNgayMicroservice.Controllers
             });
 
             return Ok("Đã xóa và gửi yêu cầu đồng bộ!");
+        }
+
+        // GET: api/query/insurance-types
+        [HttpGet]
+        public async Task<ActionResult<List<InsuranceTypeDto>>> GetAll()
+        {
+            var results = await _repo.GetAllAsync();
+
+            if (results == null || results.Count == 0)
+            {
+                return NoContent(); // Trả về 204 nếu trống
+            }
+
+            return Ok(results);
+        }
+
+        // GET: api/query/insurance-types/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<InsuranceTypeDto>> GetById(int id)
+        {
+            var result = await _repo.GetByIdAsync(id);
+
+            if (result == null)
+            {
+                return NotFound(new { Message = $"Không tìm thấy loại bảo hiểm với ID: {id}" });
+            }
+
+            return Ok(result);
         }
     }
 }

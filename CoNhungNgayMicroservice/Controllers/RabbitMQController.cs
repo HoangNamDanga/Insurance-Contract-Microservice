@@ -1,8 +1,8 @@
 ﻿using MassTransit;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using MongoDBCore.Entities.Models.DTOs;
-using OracleSQLCore.Models;
+using MongoDBCore.Entities.Models;
+using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Services;
 using Polly;
 
@@ -22,7 +22,7 @@ namespace CoNhungNgayMicroservice.Controllers
 
 
         [HttpPost("sync")]
-        public async Task<IActionResult> Create([FromBody] Customer customer, [FromServices] IPublishEndpoint publishEndpoint)
+        public async Task<IActionResult> Create([FromBody] OracleSQLCore.Models.DTOs.Customer customer, [FromServices] IPublishEndpoint publishEndpoint)
         {
             // 1. Lưu vào Oracle (Database nội bộ)
             var id = await _customerService.CreateCustomer(customer);

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MongoDBCore.Entities.Models.DTOs
+namespace Shared.Contracts.Events
 {
     public class InsuranceTypeEvent
     {

@@ -1,5 +1,5 @@
 ﻿using MassTransit;
-using MongoDBCore.Entities.Models.DTOs;
+using MongoDBCore.Entities.Models;
 using MongoDBCore.Services;
 using Polly;
 using System;

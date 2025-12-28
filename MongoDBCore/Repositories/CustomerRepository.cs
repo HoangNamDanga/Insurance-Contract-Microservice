@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using MongoDBCore.Entities.Models;
-using MongoDBCore.Entities.Models.DTOs;
 using MongoDBCore.Interfaces;
 using System;
 using System.Collections.Generic;
