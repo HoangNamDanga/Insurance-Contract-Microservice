@@ -58,18 +58,29 @@ builder.Services.AddScoped<OracleSQLCore.Interface.ICustomerRepository>(
     _ => new OracleSQLCore.Repositories.CustomerRepository(oracleConnectionString)
 );
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+
+
+
 builder.Services.AddScoped<OracleSQLCore.Interface.IInsuranceTypeRepository>(
     _ => new OracleSQLCore.Repositories.InsuranceTypeRepository(oracleConnectionString)
 );
+
+builder.Services.AddScoped<OracleSQLCore.Interface.IPolicyRepository>(
+    _ => new OracleSQLCore.Repositories.PolicyRepository(oracleConnectionString)
+);
+
+
+
 builder.Services.AddScoped<IInsuranceTypeService, InsuranceTypeService>();
 builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
     new AgentRepository(oracleConnectionString!));
 builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<IPolicyService, PolicyService>();
 #endregion
 // End
 // ??ng ký cho MongoDB
 #region MongoDb, Repo
-
+builder.Services.AddScoped<MongoDBCore.Interfaces.IPolicyRepository, MongoDBCore.Repositories.PolicyRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCore.Repositories.CustomerRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IAgentRepository, MongoDBCore.Repositories.AgentRepository>();
 builder.Services.AddScoped<MongoDBCore.Services.ICustomerService, MongoDBCore.Services.Imp.CustomerService>();
@@ -123,7 +134,7 @@ builder.Services.AddHttpClient("MongoSyncClient") // // g?n polly vào client -> 
 
 #region Cách 2 . Áp d?ng v?i RabbitMQ ch? Retry
 //poly kieu 2 - dùng trong consumer và controlelr
-builder.Services.AddSingleton<AsyncRetryPolicy>(sp =>
+builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u có th? thì s? làm ki?u interface IASyncPolicy, còn ?ây là cách c? th?
 {
     return Policy
         .Handle<Exception>() // X? lý khi có b?t k? l?i nào x?y ra
@@ -147,11 +158,16 @@ builder.Services.AddSingleton<AsyncRetryPolicy>(sp =>
 builder.Services.AddMassTransit(x =>
 {
     // --- ??NG KÝ CÁC CONSUMER ---
+    x.AddConsumer<PolicyChangedConsumer>();
     x.AddConsumer<CustomerCreatedConsumer>();
+    x.AddConsumer<PolicyCreatedConsumer>();
     x.AddConsumer<InsuranceTypeCreateConsumer>(); // Thêm dòng này cho Insurance
     x.AddConsumer<AgentCreatedConsumer>(); // Thêm dòng này cho Insurance
     x.UsingRabbitMq((context, cfg) =>
     {
+        // THÊM DÒNG NÀY: Áp d?ng cho m?i Endpoint bên d??i
+        cfg.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+
         cfg.Host("rabbitmq", "/", h =>
         {
             h.Username("guest");
@@ -173,6 +189,17 @@ builder.Services.AddMassTransit(x =>
         cfg.ReceiveEndpoint("agent-sync-queue", e =>
         {
             e.ConfigureConsumer<AgentCreatedConsumer>(context);
+        });
+
+        // --- ENDPOINT 4: Cho Policy ---
+        cfg.ReceiveEndpoint("policy-sync-queue", e =>
+        {
+            e.ConfigureConsumer<PolicyCreatedConsumer>(context);
+        });
+
+        cfg.ReceiveEndpoint("policy-changed-sync-queue", e =>
+        {
+            e.ConfigureConsumer<PolicyChangedConsumer>(context);
         });
     });
 });

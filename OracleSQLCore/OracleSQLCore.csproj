@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Folder Include="DataAccess\" />
+    <Folder Include="Models\Raw\" />
   </ItemGroup>
 
   <ItemGroup>

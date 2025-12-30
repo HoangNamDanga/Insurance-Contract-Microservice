@@ -20,5 +20,7 @@ namespace MongoDBCore.Entities.Models
         public string InsuranceTypeCollectionName { get; set; } = null!;
 
         public string AgentCollectionName { get; set; } = null!;
+
+        public string PolicyCollectionName { get; set; } = null!;
     }
 }
