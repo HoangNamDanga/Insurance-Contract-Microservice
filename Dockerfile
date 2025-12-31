@@ -10,7 +10,7 @@ COPY Shared.Contracts/Shared.Contracts.csproj Shared.Contracts/
 COPY CoNhungNgayMicroservice/CoNhungNgayMicroservice.csproj CoNhungNgayMicroservice/
 COPY MongoDBCore/MongoDBCore.csproj MongoDBCore/
 COPY OracleSQLCore/OracleSQLCore.csproj OracleSQLCore/
-
+COPY Insurance.Tests/Insurance.Tests.csproj Insurance.Tests/
 # 3. Restore toàn bộ các dependencies dựa trên file .sln
 RUN dotnet restore
 
