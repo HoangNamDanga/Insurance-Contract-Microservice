@@ -15,20 +15,27 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_started
+      redis:
+        condition: service_started
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
+
+      # ===== REDIS =====
+      # Lưu ý: Pass ở đây phải khớp với requirepass của service redis bên dưới
+      - Redis__ConnectionString=redis:6379,password=myredispw123
 
       # ===== MONGODB =====
       - MongoDBSettings__ConnectionString=mongodb://mongodb:27017
       - MongoDBSettings__DatabaseName=InsuranceDB
       - MongoDBSettings__CustomerCollectionName=Customers
-      - MongoDBSettings__InsuranceTypeCollectionName=InsuranceTypes # Thêm dòng này
-      - MongoDBSettings__AgentCollectionName=Agents # Thêm dòng này
-      - MongoDBSettings__PolicyCollectionName=Policy # Thêm dòng này
+      - MongoDBSettings__InsuranceTypeCollectionName=InsuranceTypes
+      - MongoDBSettings__AgentCollectionName=Agents
+      - MongoDBSettings__PolicyCollectionName=Policy
 
       # ===== ORACLE =====
-      - ConnectionStrings__OracleDbConnection=User Id=INSURANCE_USER;Password=mypassword123;Data Source=oracle:1521/XEPDB1 #dùng oracle thay vì localhost? Vì trong mạng Docker (networks: backend), các container gọi nhau bằng Tên Service.
+      # Password ở đây phải khớp với ORACLE_PASSWORD bên dưới
+      - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
 
       # ===== RABBITMQ =====
       - RabbitMQ__HostName=rabbitmq
@@ -36,6 +43,18 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
 
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    command: redis-server --requirepass myredispw123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
       - backend
 
@@ -57,15 +76,12 @@ services:
     ports:
       - "1522:1521"
     environment:
+      # Đây là biến quan trọng nhất để sửa lỗi "specify a password" của bạn
       - ORACLE_PASSWORD=mypassword123
     volumes:
       - oracle_data:/opt/oracle/oradata
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "echo \"SELECT 1 FROM DUAL;\" | sqlplus -s system/mypassword123@//localhost:1521/XEPDB1"
-        ]
+      test: ["CMD-SHELL", "echo \"SELECT 1 FROM DUAL;\" | sqlplus -s system/mypassword123@//localhost:1521/XEPDB1"]
       interval: 20s
       timeout: 10s
       retries: 15
@@ -78,8 +94,8 @@ services:
     container_name: rabbitmq
     restart: always
     ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
+      - "5672:5672"
+      - "15672:15672"
     networks:
       - backend
 
@@ -88,5 +104,6 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_data: #Đối với Cơ sở dữ liệu (Oracle & MongoDB) -> KHÔNG MẤT khi chạy lệnh docker-compose down, nếu có -v mới mất hết
+  mongo_data:
   oracle_data:
+  redis_data:

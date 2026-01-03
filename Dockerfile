@@ -14,15 +14,23 @@ COPY Insurance.Tests/Insurance.Tests.csproj Insurance.Tests/
 # 3. Restore toàn bộ các dependencies dựa trên file .sln
 RUN dotnet restore
 
-# 4. Copy toàn bộ mã nguồn của tất cả các project vào container
 COPY . .
 
-# 5. Chuyển đến thư mục dự án cần chạy và Build
-WORKDIR /src/CoNhungNgayMicroservice
-RUN dotnet publish -c Release -o /app/publish
+# 2. Restore đích danh project API 
+# Việc này sẽ tự động kéo theo dependencies của Shared.Contracts, MongoDBCore, OracleSQLCore
+RUN dotnet restore "CoNhungNgayMicroservice/CoNhungNgayMicroservice.csproj"
 
-# --- Stage 2: Runtime (Giúp Image nhẹ hơn - Tùy chọn nhưng nên làm) ---
+# 3. Build và Publish
+WORKDIR "/src/CoNhungNgayMicroservice"
+RUN dotnet publish "CoNhungNgayMicroservice.csproj" -c Release -o /app/publish
+
+# --- Stage 2: Runtime ---
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /app/publish .
+
+# Đảm bảo cổng khớp với docker-compose
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "CoNhungNgayMicroservice.dll"]

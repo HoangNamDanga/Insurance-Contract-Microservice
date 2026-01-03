@@ -2,6 +2,7 @@
 using MongoDB.Driver;
 using MongoDBCore.Entities.Models;
 using MongoDBCore.Interfaces;
+using MongoDBCore.Services;
 using Shared.Contracts.Events;
 using System;
 using System.Collections.Generic;
@@ -14,13 +15,15 @@ namespace MongoDBCore.Repositories
     public class PolicyRepository : IPolicyRepository
     {
         private readonly IMongoCollection<PolicyDto> _policiesCollection;
+        private readonly ICacheService _cache;
 
-        public PolicyRepository(IOptions<MongoDbSettings> options)
+        public PolicyRepository(IOptions<MongoDbSettings> options, ICacheService cache)
         {
             var settings = options.Value;
             var mongoClient = new MongoClient(settings.ConnectionString);
             var mongoDatabase = mongoClient.GetDatabase(settings.DatabaseName);
             _policiesCollection = mongoDatabase.GetCollection<PolicyDto>(settings.PolicyCollectionName);
+            _cache = cache;
         }
         public async Task DeleteAsync(int id)
         {
@@ -33,9 +36,21 @@ namespace MongoDBCore.Repositories
             return await _policiesCollection.Find(_ => true).ToListAsync();
         }
 
+
+        //Nếu bạn cache ở MongoDB: Bạn đang làm nhanh trải nghiệm cho tất cả người dùng cuối khi họ vào tra cứu hợp đồng.
+        //Đây mới là giá trị thực sự của Microservices CQRS.
         public async Task<PolicyDto> GetByIdAsync(int id)
         {
-            return await _policiesCollection.Find(x => x.PolicyId == id).FirstOrDefaultAsync();
+            string cacheKey = $"policy:{id}";
+
+            // Hàm GetOrSetAsync sẽ tự động thực hiện:
+            // 1. Kiểm tra Redis (Get)
+            // 2. Nếu trống -> Chạy hàm bên dưới để lấy từ MongoDB
+            // 3. Lấy được dữ liệu -> Tự động Lưu vào Redis (Set)
+            return await _cache.GetOrSetAsync(cacheKey, async () =>
+            {
+                return await _policiesCollection.Find(x => x.PolicyId == id).FirstOrDefaultAsync();
+            }, TimeSpan.FromMinutes(30));
         }
 
         public async Task UpsertAsync(PolicyDto policytDto)
