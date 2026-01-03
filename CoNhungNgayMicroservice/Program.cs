@@ -12,6 +12,8 @@ using MassTransit;
 using MongoDBCore.Repositories.Consumer;
 using Polly.Retry;
 using Microsoft.OpenApi;
+using MongoDBCore.Services.CachingImp;
+using MongoDBCore.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,10 +59,6 @@ if (string.IsNullOrWhiteSpace(mongoConnectionString))
 builder.Services.AddScoped<OracleSQLCore.Interface.ICustomerRepository>(
     _ => new OracleSQLCore.Repositories.CustomerRepository(oracleConnectionString)
 );
-builder.Services.AddScoped<ICustomerService, CustomerService>();
-
-
-
 builder.Services.AddScoped<OracleSQLCore.Interface.IInsuranceTypeRepository>(
     _ => new OracleSQLCore.Repositories.InsuranceTypeRepository(oracleConnectionString)
 );
@@ -71,6 +69,7 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IPolicyRepository>(
 
 
 
+builder.Services.AddScoped<OracleSQLCore.Services.ICustomerService, CustomerService>();
 builder.Services.AddScoped<IInsuranceTypeService, InsuranceTypeService>();
 builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
     new AgentRepository(oracleConnectionString!));
@@ -205,6 +204,15 @@ builder.Services.AddMassTransit(x =>
 });
 #endregion
 
+#region Redis
+//Cauas hinfh docker
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"];
+});
+//DI
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
+#endregion
 
 
 
