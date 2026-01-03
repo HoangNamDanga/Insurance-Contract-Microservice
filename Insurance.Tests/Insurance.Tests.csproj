@@ -23,6 +23,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\MongoDBCore\MongoDBCore.csproj" />
+		<ProjectReference Include="..\OracleSQLCore\OracleSQLCore.csproj" />
 		<ProjectReference Include="..\Shared.Contracts\Shared.Contracts.csproj" />
 	</ItemGroup>
 </Project>
