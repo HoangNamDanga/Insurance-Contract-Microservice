@@ -1,0 +1,28 @@
+﻿
+//File policy.proto (Hợp đồng giao tiếp - Interface Definition)
+//File này thuộc về Protocol Buffers (Protobuf)
+//Đây là quy định về các hàm và kiểu dữ liệu mà Server và Client sẽ dùng để nói chuyện
+syntax = "proto3";
+
+// Namespace này sẽ được dùng trong code C# của bạn
+option csharp_namespace = "CoNhungNgayMicroservice.Grpc";
+
+service PolicyGrpc {
+  // Định nghĩa một hàm lấy Policy theo ID
+  rpc GetPolicyById (PolicyRequest) returns (PolicyResponse);
+}
+
+message PolicyRequest {
+  int32 id = 1;
+}
+
+message PolicyResponse {
+  int32 policy_id = 1;
+  string policy_number = 2;
+  string customer_name = 3;
+  double premium_amount = 4;
+  string status = 5;
+}
+
+//Kết quả: Khi bạn Build project,
+//file này sẽ sinh ra các class C# ẩn trong thư mục obj (như Policy.cs và PolicyGrpc.cs) mà bạn đã thấy.

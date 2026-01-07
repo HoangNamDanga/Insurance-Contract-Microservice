@@ -1,4 +1,4 @@
-using OracleSQLCore.Interface;
+Ôªøusing OracleSQLCore.Interface;
 using OracleSQLCore.Repositories;
 using OracleSQLCore.Services;
 using OracleSQLCore.Services.Imp;
@@ -14,6 +14,7 @@ using Polly.Retry;
 using Microsoft.OpenApi;
 using MongoDBCore.Services.CachingImp;
 using MongoDBCore.Services;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,41 +22,61 @@ builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddSwaggerGen(options => // C?u hÏnh Swagger ph‚n bi?t tÍn file tr˘ng nhau b?ng namespace
+builder.Services.AddSwaggerGen(options => // C?u h√¨nh Swagger ph√¢n bi?t t√™n file tr√πng nhau b?ng namespace
 {
-    // DÚng n‡y c?c k? quan tr?ng ?? s?a l?i b?n ?ang g?p
-    // NÛ s? d˘ng Full Name (Namespace + ClassName) ?? l‡m ID trong Swagger
+    // D√≤ng n√†y c?c k? quan tr?ng ?? s?a l?i b?n ?ang g?p
+    // N√≥ s? d√πng Full Name (Namespace + ClassName) ?? l√†m ID trong Swagger
     options.CustomSchemaIds(type => type.FullName);
 });
 
 // ===== ConnectionStrings =====
-// 1. L?y connection string t? c?u hÏnh (appsettings ho?c Docker Env)
+// 1. L?y connection string t? c?u h√¨nh (appsettings ho?c Docker Env)
 
-#region ConnectionString
-var oracleConnectionString =
-    builder.Configuration.GetConnectionString("OracleDbConnection");
-
+#region ConnectionString & MongoDB Services
+// 1. L·∫•y ConnectionString c·ªßa Oracle
+var oracleConnectionString = builder.Configuration.GetConnectionString("OracleDbConnection");
 if (string.IsNullOrWhiteSpace(oracleConnectionString))
     throw new InvalidOperationException("OracleDbConnection is missing");
 
+// 2. C·∫•u h√¨nh MongoDbSettings t·ª´ appsettings/Docker Environment
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDBSettings"));
 
+// ƒêƒÉng k√Ω MongoDbSettings d∆∞·ªõi d·∫°ng Singleton ƒë·ªÉ c√°c Service kh√°c c√≥ th·ªÉ d√πng IOptions
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<MongoDbSettings>>().Value);
 
-var mongoConnectionString =
-    builder.Configuration["MongoDBSettings:ConnectionString"];
-
+var mongoConnectionString = builder.Configuration["MongoDBSettings:ConnectionString"];
 if (string.IsNullOrWhiteSpace(mongoConnectionString))
-{
     throw new InvalidOperationException("MongoDbConnection is missing");
-}
+
+// --- PH·∫¶N B·ªî SUNG ƒê·ªÇ S·ª¨A L·ªñI gRPC ---
+
+// 3. ƒêƒÉng k√Ω IMongoClient d∆∞·ªõi d·∫°ng Singleton (D√πng chung Connection Pool)
+builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
+
+// 4. ƒêƒÉng k√Ω IMongoDatabase
+builder.Services.AddScoped(sp =>
+{
+    var client = sp.GetRequiredService<IMongoClient>();
+    var settings = sp.GetRequiredService<MongoDbSettings>();
+    return client.GetDatabase(settings.DatabaseName);
+});
+
+// 5. ƒêƒÉng k√Ω IMongoCollection<PolicyDto> 
+// ƒê√¢y ch√≠nh l√† d·ªãch v·ª• m√† PolicyGrpcService ƒëang t√¨m ki·∫øm trong Constructor
+builder.Services.AddScoped<IMongoCollection<PolicyDto>>(sp =>
+{
+    var database = sp.GetRequiredService<IMongoDatabase>();
+    var settings = sp.GetRequiredService<MongoDbSettings>();
+    return database.GetCollection<PolicyDto>(settings.PolicyCollectionName);
+});
+
 #endregion
 
 #region Oracle DI, Service + Repo
 // ===== Oracle DI =====
-//2. ??ng k˝ Repository v‡o h? th?ng DI
-// ??ng k˝ cho Oracle
+//2. ??ng k√Ω Repository v√†o h? th?ng DI
+// ??ng k√Ω cho Oracle
 builder.Services.AddScoped<OracleSQLCore.Interface.ICustomerRepository>(
     _ => new OracleSQLCore.Repositories.CustomerRepository(oracleConnectionString)
 );
@@ -71,13 +92,13 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IPolicyRepository>(
 
 builder.Services.AddScoped<OracleSQLCore.Services.ICustomerService, CustomerService>();
 builder.Services.AddScoped<IInsuranceTypeService, InsuranceTypeService>();
-builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string v‡o Constructor, g?i l‡ Factory Registration
+builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string v√†o Constructor, g?i l√† Factory Registration
     new AgentRepository(oracleConnectionString!));
 builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 #endregion
 // End
-// ??ng k˝ cho MongoDB
+// ??ng k√Ω cho MongoDB
 #region MongoDb, Repo
 builder.Services.AddScoped<MongoDBCore.Interfaces.IPolicyRepository, MongoDBCore.Repositories.PolicyRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCore.Repositories.CustomerRepository>();
@@ -96,52 +117,52 @@ builder.Services.AddHealthChecks()
         name: "mongodb"
     );
 
-// ??ng k˝ c·c d?ch v? hi?n cÛ c?a b?n
+// ??ng k√Ω c√°c d?ch v? hi?n c√≥ c?a b?n
 builder.Services.AddControllers();
 
-// ??ng k˝ HttpClient ?? c·c service cÛ th? g?i nhau
+// ??ng k√Ω HttpClient ?? c√°c service c√≥ th? g?i nhau
 builder.Services.AddHttpClient();
 
 
 
 #region Polly
-// C?u hÏnh chÌnh s·ch: Th? l?i 3 l?n, m?i l?n c·ch nhau 2 gi‚y n?u g?p l?i m?ng ho?c l?i 5xx
-//g?n Polly v‡o HttpClient, h‡m t?o Create controller Oracle
-// ?o?n codde n‡y cÛ nhi?m v? ìM?i khi tÙi g?i CreateClient("MongoSyncClient") thÏ m?i HTTP request g?i ?i s? t? ??ng cÛ retry + circuit breaker.î
+// C?u h√¨nh ch√≠nh s√°ch: Th? l?i 3 l?n, m?i l?n c√°ch nhau 2 gi√¢y n?u g?p l?i m?ng ho?c l?i 5xx
+//g?n Polly v√†o HttpClient, h√†m t?o Create controller Oracle
+// ?o?n codde n√†y c√≥ nhi?m v? ‚ÄúM?i khi t√¥i g?i CreateClient("MongoSyncClient") th√¨ m?i HTTP request g?i ?i s? t? ??ng c√≥ retry + circuit breaker.‚Äù
 
-#region C·ch 1 ·p d?ng v?i Service A ??ng b? v?i Service B bÏnh th??ng ·p d?ng c? 2 g?n v‡o HttpClient v‡ sau ?Û g?i b?ng PostJson
+#region C√°ch 1 √°p d?ng v?i Service A ??ng b? v?i Service B b√¨nh th??ng √°p d?ng c? 2 g?n v√†o HttpClient v√† sau ?√≥ g?i b?ng PostJson
 var retryPolicy = HttpPolicyExtensions
     .HandleTransientHttpError() // b?t l?i t?m th?i include L?i m?ng (HttpRequestException), HTTP 5xx, HTTP 408 (Timeout)
     .WaitAndRetryAsync(
         retryCount: 3, // n?u g?p l?i th? l?i 3 l?n
-        sleepDurationProvider: _ => TimeSpan.FromSeconds(2)); // ch? 2 gi‚y, gi˙p service ?Ìch cÛ th?i gian h?i ph?c, tr·nh th?i gian request
+        sleepDurationProvider: _ => TimeSpan.FromSeconds(2)); // ch? 2 gi√¢y, gi√∫p service ?√≠ch c√≥ th?i gian h?i ph?c, tr√°nh th?i gian request
 
 //polly kieu 1
-var circuitBreaker = HttpPolicyExtensions // c?ng b?t c˘ng c·c lo?i l?i nh? retry
+var circuitBreaker = HttpPolicyExtensions // c?ng b?t c√πng c√°c lo?i l?i nh? retry
     .HandleTransientHttpError()
     .CircuitBreakerAsync(
-        handledEventsAllowedBeforeBreaking: 5, // n?u cÛ 5 yÍu c?u liÍn ti?p (sau khi retry xong) v?n lıi -> Circuit s? OPEN => ?? 1 request = ?„ retry xong m?i tÌnh
-        durationOfBreak: TimeSpan.FromSeconds(30)); // trong 30 gi‚y m?i request khÙng g?i HTTP, KhÙng retry, Fail Ngay
+        handledEventsAllowedBeforeBreaking: 5, // n?u c√≥ 5 y√™u c?u li√™n ti?p (sau khi retry xong) v?n l√µi -> Circuit s? OPEN => ?? 1 request = ?√£ retry xong m?i t√≠nh
+        durationOfBreak: TimeSpan.FromSeconds(30)); // trong 30 gi√¢y m?i request kh√¥ng g?i HTTP, Kh√¥ng retry, Fail Ngay
 
-builder.Services.AddHttpClient("MongoSyncClient") // // g?n polly v‡o client -> CreateClient("MongoSyncClient") ? t? ??ng cÛ retry
+builder.Services.AddHttpClient("MongoSyncClient") // // g?n polly v√†o client -> CreateClient("MongoSyncClient") ? t? ??ng c√≥ retry
     .AddPolicyHandler(retryPolicy) // m?i request g?i ?i -> retry theo retryPolicy
-    .AddPolicyHandler(circuitBreaker); // N?u l?i nhi?u -> circuit breaker qu?n l˝
-// Ch˙ ˝ th? t? trong Pollyu r?t quan tr?ng. Retry tr??c -> Circuit breaker sau -> ?‚y l‡ th? t? ?˙ng
+    .AddPolicyHandler(circuitBreaker); // N?u l?i nhi?u -> circuit breaker qu?n l√Ω
+// Ch√∫ √Ω th? t? trong Pollyu r?t quan tr?ng. Retry tr??c -> Circuit breaker sau -> ?√¢y l√† th? t? ?√∫ng
 
 #endregion
 
 
-#region C·ch 2 . ¡p d?ng v?i RabbitMQ ch? Retry
-//poly kieu 2 - d˘ng trong consumer v‡ controlelr
-builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u cÛ th? thÏ s? l‡m ki?u interface IASyncPolicy, cÚn ?‚y l‡ c·ch c? th?
+#region C√°ch 2 . √Åp d?ng v?i RabbitMQ ch? Retry
+//poly kieu 2 - d√πng trong consumer v√† controlelr
+builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u c√≥ th? th√¨ s? l√†m ki?u interface IASyncPolicy, c√≤n ?√¢y l√† c√°ch c? th?
 {
     return Policy
-        .Handle<Exception>() // X? l˝ khi cÛ b?t k? l?i n‡o x?y ra
+        .Handle<Exception>() // X? l√Ω khi c√≥ b?t k? l?i n√†o x?y ra
         .WaitAndRetryAsync(3, retryAttempt =>
             TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Th? l?i sau 2s, 4s, 8s
             (exception, timeSpan, retryCount, context) =>
             {
-                // B?n cÛ th? log l?i ? ?‚y n?u c?n
+                // B?n c√≥ th? log l?i ? ?√¢y n?u c?n
                 Console.WriteLine($"Retry {retryCount} due to: {exception.Message}");
             });
 });
@@ -152,19 +173,19 @@ builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u cÛ th? thÏ s? l‡m k
 
 #region RabbitMQ
 //RabbitMQ
-//Bus (MassTransit bus) l‡ n?i c·c consumer ??ng k˝ ?? nh?n message.
-//Ch? project n‡o cÛ consumer m?i c?n c?u hÏnh consumer + bus ?? nh?n message.
+//Bus (MassTransit bus) l√† n?i c√°c consumer ??ng k√Ω ?? nh?n message.
+//Ch? project n√†o c√≥ consumer m?i c?n c?u h√¨nh consumer + bus ?? nh?n message.
 builder.Services.AddMassTransit(x =>
 {
-    // --- ??NG K› C¡C CONSUMER ---
+    // --- ??NG K√ù C√ÅC CONSUMER ---
     x.AddConsumer<PolicyChangedConsumer>();
     x.AddConsumer<CustomerCreatedConsumer>();
     x.AddConsumer<PolicyCreatedConsumer>();
-    x.AddConsumer<InsuranceTypeCreateConsumer>(); // ThÍm dÚng n‡y cho Insurance
-    x.AddConsumer<AgentCreatedConsumer>(); // ThÍm dÚng n‡y cho Insurance
+    x.AddConsumer<InsuranceTypeCreateConsumer>(); // Th√™m d√≤ng n√†y cho Insurance
+    x.AddConsumer<AgentCreatedConsumer>(); // Th√™m d√≤ng n√†y cho Insurance
     x.UsingRabbitMq((context, cfg) =>
     {
-        // TH M D“NG N¿Y: ¡p d?ng cho m?i Endpoint bÍn d??i
+        // TH√äM D√íNG N√ÄY: √Åp d?ng cho m?i Endpoint b√™n d??i
         cfg.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
 
         cfg.Host("rabbitmq", "/", h =>
@@ -180,7 +201,7 @@ builder.Services.AddMassTransit(x =>
         });
 
         // --- ENDPOINT 2: Cho Insurance Type ---
-        cfg.ReceiveEndpoint("insurance-type-sync-queue", e => // TÍn queue nÍn ??t riÍng bi?t
+        cfg.ReceiveEndpoint("insurance-type-sync-queue", e => // T√™n queue n√™n ??t ri√™ng bi?t
         {
             e.ConfigureConsumer<InsuranceTypeCreateConsumer>(context);
         });
@@ -215,8 +236,30 @@ builder.Services.AddScoped<ICacheService, RedisCacheService>();
 #endregion
 
 
+#region ƒêƒÉng k√Ω gRPC v√† GraphQL
+builder.Services.AddGrpc();
+
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<CoNhungNgayMicroservice.GraphQL.Query>()
+    .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = true);
+
+
+
+//builder.WebHost.ConfigureKestrel(options =>
+//{
+//    // L·∫Øng nghe tr√™n c·ªïng 8080 cho c·∫£ HTTP/1.1 v√† HTTP/2
+//    options.ListenAnyIP(8080, listenOptions =>
+//    {
+//        // Cho ph√©p Kestrel t·ª± ƒë·ªông nh·∫≠n di·ªán giao th·ª©c (HTTP/1 ho·∫∑c HTTP/2)
+//        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
+//    });
+//});
+#endregion
+
 
 var app = builder.Build();
+
 
 
 
@@ -233,4 +276,14 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
+
+
+
+#region K√≠ch ho·∫°t Endpoints
+app.MapGraphQL();
+app.MapGrpcService<CoNhungNgayMicroservice.Services.PolicyGrpcService>();
+
+// Th√™m d√≤ng n√†y ƒë·ªÉ h·ªó tr·ª£ g·ªçi gRPC t·ª´ c√°c c√¥ng c·ª• c≈© ho·∫∑c tr√¨nh duy·ªát (n·∫øu c·∫ßn)
+app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client.");
+#endregion
 app.Run();

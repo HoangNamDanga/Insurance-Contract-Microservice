@@ -7,7 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: conhungngay-api
     ports:
-      - "8080:8080"
+      - "8080:8080" # Cổng cho Swagger/REST (HTTP/1)
+      - "8081:8081"  # Cổng cho gRPC (HTTP/2)
     depends_on:
       oracle:
         condition: service_healthy
@@ -19,8 +20,13 @@ services:
         condition: service_started
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080
-
+      - ASPNETCORE_URLS=http://+:8080;http://+:8081
+      # Endpoint cho REST/Swagger
+      - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
+      - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1
+      # Endpoint cho gRPC
+      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
+      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2
       # ===== REDIS =====
       # Lưu ý: Pass ở đây phải khớp với requirepass của service redis bên dưới
       - Redis__ConnectionString=redis:6379,password=myredispw123
