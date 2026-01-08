@@ -10,14 +10,14 @@ namespace Shared.Contracts.Events
     public class PolicyChangedEvent
     {
         public int PolicyId { get; set; }
-        public string PolicyNumber { get; set; }
+        public string PolicyNumber { get; set; } = string.Empty;
 
         //thong tin nghiep vu thay doi
         public string ActionType { get; set; } // "CREATE", "UPDATE", "RENEW", "CANCEL"
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public DateTime EndDate { get; set; }
         public decimal TotalPremium { get; set; }
-        public string LastNotes { get; set; }
+        public string LastNotes { get; set; } = string.Empty;
         public DateTime ChangeDate { get; set; }
     }
 }

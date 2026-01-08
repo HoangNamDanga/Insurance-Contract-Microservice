@@ -43,17 +43,33 @@ namespace Insurance.Tests
         public async Task RenewAsync_WhenSuccess_ShouldPublishEvent()
         {
             // 1. Arrange
-            var request = new RenewPolicyDto { PolicyId = 101 };
-            var resultEvent = new PolicyChangedEvent { PolicyId = 101, ActionType = "RENEW" };
+            var request = new RenewPolicyDto
+            {
+                PolicyId = 101,
+                NewEndDate = DateTime.Now.AddYears(1),
+                AdditionalPremium = 500000
+            };
+
+            // Giả lập Event trả về có đầy đủ thông tin mới từ DB
+            var resultEvent = new PolicyChangedEvent
+            {
+                PolicyId = 101,
+                ActionType = "RENEW",
+                EndDate = request.NewEndDate, // Cần kiểm tra xem thông tin này có được bắn đi không
+                TotalPremium = 1500000
+            };
 
             _mocRepo.Setup(x => x.RenewAsync(request)).ReturnsAsync(resultEvent);
 
             // 2. Act
             await _service.RenewAsync(request);
 
-            // 3. Assert: Kiểm tra xem Publish có được gọi bên trong RetryPolicy hay không
+            // 3. Assert: Kiểm tra xem thông tin quan trọng có trong bản tin gửi đi không
             _mocBus.Verify(x => x.Publish(
-                It.Is<PolicyChangedEvent>(m => m.PolicyId == 101 && m.ActionType == "RENEW"),
+                It.Is<PolicyChangedEvent>(m =>
+                    m.PolicyId == 101 &&
+                    m.ActionType == "RENEW" &&
+                    m.EndDate == resultEvent.EndDate), // Thêm kiểm tra này
                 It.IsAny<CancellationToken>()
             ), Times.Once);
         }

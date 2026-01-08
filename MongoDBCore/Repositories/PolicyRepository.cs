@@ -79,5 +79,33 @@ namespace MongoDBCore.Repositories
                 .Set(x => x.PremiumAmount, totalPremium);
             await _policiesCollection.UpdateOneAsync(filter, update);
         }
+
+        public async Task<List<PolicyDto>> SearchAsync(string customerName, string status, DateTime? endDateFrom, DateTime? endDateTo)
+        {
+            var builder = Builders<PolicyDto>.Filter;
+            var filter = builder.Empty;
+
+
+            //Tim theo tên (không phân biệt hoa thường)
+            //filter &= Đây là toán tử nối điều kiện AND. Mỗi khi một điều kiện được thêm vào , kết quả trả về phải thỏa mãn đồng thời tất cả các điều kiện đó
+            if (!string.IsNullOrEmpty(customerName))
+                filter &= builder.Regex(x => x.CustomerName, new MongoDB.Bson.BsonRegularExpression(customerName)); // BsonRegularExpression giúp bạn tìm kiếm "gần đúng". Ví dụ: tìm "Nam" sẽ ra "Nguyễn Văn Nam"
+
+
+            //Tim theo trang thai (ACTIVE, CANCELLED, RENEWED)
+            if (!string.IsNullOrEmpty(status))
+                filter &= builder.Eq(x => x.Status, status);
+
+            //Tìm theo khoảng ngày hết hạn
+            if (endDateFrom.HasValue)
+                filter &= builder.Gte(x => x.EndDate, endDateFrom.Value); //Gte (Greater than or equal): $>=$.
+
+            if (endDateFrom.HasValue)
+                filter &= builder.Lte(x => x.EndDate, endDateTo.Value); // Lte (Less than or equal): $<=$.
+
+            return await _policiesCollection.Find(filter)
+                                            .Limit(100)
+                                            .ToListAsync();
+        }
     }
 }

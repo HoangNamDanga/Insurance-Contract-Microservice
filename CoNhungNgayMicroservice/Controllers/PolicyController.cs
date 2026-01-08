@@ -82,18 +82,22 @@ namespace CoNhungNgayMicroservice.Controllers
         [HttpPost("renew")]
         public async Task<IActionResult> Renew([FromBody] RenewPolicyDto request)
         {
+            // 1. Kiểm tra tính hợp lệ của Request
             if (request == null || request.PolicyId <= 0)
             {
                 return BadRequest("Thông tin gia hạn không hợp lệ.");
             }
-
             try
             {
+                // 2. Thực hiện nghiệp vụ chính tại Oracle thông qua Service
+                // Hàm RenewAsync này sẽ: Gọi Procedure -> Lưu History -> Publish tin nhắn qua RabbitMQ/Kafka
                 var result = await _policyService.RenewAsync(request);
 
                 if (result == null)
                     return NotFound($"Không tìm thấy hợp đồng ID {request.PolicyId} để gia hạn.");
 
+                // 3. Trả về kết quả thành công cho người dùng
+                // Lúc này, Consumer ở một tiến trình khác sẽ nhận tin nhắn, cập nhật Mongo và XÓA CACHE
                 return Ok(new
                 {
                     Message = "Gia hạn hợp đồng thành công",
@@ -102,7 +106,13 @@ namespace CoNhungNgayMicroservice.Controllers
             }
             catch (Exception ex)
             {
-                // Log error here
+                // Phân tích lỗi từ Oracle gửi về (ví dụ ORA-20001 đã chặn ở Database)
+                if (ex.Message.Contains("ORA-20001"))
+                {
+                    return BadRequest($"Lỗi nghiệp vụ: {ex.Message}");
+                }
+
+                // Các lỗi hệ thống khác
                 return StatusCode(500, $"Lỗi hệ thống khi gia hạn: {ex.Message}");
             }
         }
@@ -133,6 +143,35 @@ namespace CoNhungNgayMicroservice.Controllers
             {
                 // Log error here
                 return StatusCode(500, $"Lỗi hệ thống khi hủy: {ex.Message}");
+            }
+        }
+
+        //End point Search MongoDB
+        [HttpGet("search")]
+        public async Task<IActionResult> Search (
+            [FromQuery] string? customerName,
+            [FromQuery] string? status,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate)
+        {
+            try
+            {
+                //Goi xuống repository để thực hiện tìm kiếm 
+                var reuslts = await _policyRepository.SearchAsync(customerName, status, fromDate, toDate);
+
+                if(reuslts == null || reuslts.Count == 0)
+                {
+                    return Ok(new { Message = "Khong tim thay ket qua phu hop.", Data = reuslts });
+                }
+
+                return Ok(new
+                {
+                    TotalFound = reuslts.Count,
+                    Data = reuslts
+                });
+            }catch(Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi tìm kiếm: {ex.Message}" );
             }
         }
     }

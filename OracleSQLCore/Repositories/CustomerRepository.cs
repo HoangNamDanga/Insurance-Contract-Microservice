@@ -23,19 +23,19 @@ namespace OracleSQLCore.Repositories
         // CREATE
         public async Task<int> AddCustomerAsync(Customer customer)
         {
-            var sql = @"
-                INSERT INTO DHN_CUSTOMER (FULL_NAME, GENDER, DATE_OF_BIRTH, PHONE, EMAIL, ADDRESS)
-                VALUES (:FullName, :Gender, :DateOfBirth, :Phone, :Email, :Address)
-                RETURNING CUSTOMER_ID INTO :NewId";
-
-            // Dùng DynamicParameters để lấy ID sau khi INSERT
-            var parameters = new DynamicParameters(customer);
-            parameters.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
+            var parameters = new DynamicParameters();
+            parameters.Add("P_FULL_NAME", customer.FullName);
+            parameters.Add("P_GENDER", customer.Gender);
+            parameters.Add("P_DOB", customer.DateOfBirth);
+            parameters.Add("P_PHONE", customer.Phone);
+            parameters.Add("P_EMAIL", customer.Email);
+            parameters.Add("P_ADDRESS", customer.Address);
+            parameters.Add("P_NEW_ID", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
             using (var connection = CreateConnection())
             {
-                await connection.ExecuteAsync(sql, parameters);
-                return parameters.Get<int>("NewId");
+                await connection.ExecuteAsync("INSURANCE_USER.DHN_CUSTOMER_PKG.CREATE_CUSTOMER", parameters, commandType: CommandType.StoredProcedure);
+                return parameters.Get<int>("P_NEW_ID");
             }
         }
 
@@ -52,7 +52,7 @@ namespace OracleSQLCore.Repositories
                     EMAIL AS Email, 
                     ADDRESS AS Address, 
                     CREATE_DATE AS CreateDate
-                FROM DHN_CUSTOMER";
+                FROM INSURANCE_USER.DHN_CUSTOMER";
             using (var connection = CreateConnection())
             {
                 return await connection.QueryAsync<Customer>(sql);
@@ -73,7 +73,7 @@ namespace OracleSQLCore.Repositories
                     EMAIL AS Email, 
                     ADDRESS AS Address, 
                     CREATE_DATE AS CreateDate
-                FROM DHN_CUSTOMER 
+                FROM INSURANCE_USER.DHN_CUSTOMER 
                 WHERE CUSTOMER_ID = :Id"; // Tham số Oracle binding
 
                     using (var connection = CreateConnection())
@@ -87,24 +87,26 @@ namespace OracleSQLCore.Repositories
         // UPDATE
         public async Task<bool> UpdateCustomerAsync(Customer customer)
         {
-            var sql = @"
-                UPDATE DHN_CUSTOMER SET 
-                    FULL_NAME = :FullName, GENDER = :Gender, 
-                    DATE_OF_BIRTH = :DateOfBirth, PHONE = :Phone, 
-                    EMAIL = :Email, ADDRESS = :Address
-                WHERE CUSTOMER_ID = :CustomerId";
+            var parameters = new DynamicParameters();
+            parameters.Add("P_CUSTOMER_ID", customer.CustomerId);
+            parameters.Add("P_FULL_NAME", customer.FullName);
+            parameters.Add("P_GENDER", customer.Gender);
+            parameters.Add("P_DOB", customer.DateOfBirth);
+            parameters.Add("P_PHONE", customer.Phone);
+            parameters.Add("P_EMAIL", customer.Email);
+            parameters.Add("P_ADDRESS", customer.Address);
 
             using (var connection = CreateConnection())
             {
-                var affectedRows = await connection.ExecuteAsync(sql, customer);
-                return affectedRows > 0;
+                var affectedRows = await connection.ExecuteAsync("INSURANCE_USER.DHN_CUSTOMER_PKG.UPDATE_CUSTOMER", parameters, commandType: CommandType.StoredProcedure);
+                return true; // Với SP Oracle, thường ta trả về true nếu không có Exception
             }
         }
 
         // DELETE
         public async Task<bool> DeleteCustomerAsync(int customerId)
         {
-            var sql = "DELETE FROM DHN_CUSTOMER WHERE CUSTOMER_ID = :Id";
+            var sql = "DELETE FROM INSURANCE_USER.DHN_CUSTOMER WHERE CUSTOMER_ID = :Id";
             using (var connection = CreateConnection())
             {
                 var affectedRows = await connection.ExecuteAsync(sql, new { Id = customerId });

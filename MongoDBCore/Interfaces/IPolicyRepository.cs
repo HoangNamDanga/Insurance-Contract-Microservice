@@ -22,6 +22,8 @@ namespace MongoDBCore.Interfaces
         //Cap nhat khi huy? (Chỉ cần trạng thái và lý do)
         Task UpdateCancelStatusAsync(int id, string notes);
 
-
+        // --- BỔ SUNG NGHIỆP VỤ SEARCH INDEXING ---
+        // Tìm kiếm theo nhiều tiêu chí: Tên khách hàng, Trạng thái, và Khoảng ngày hết hạn
+        Task<List<PolicyDto>> SearchAsync(string customerName, string status, DateTime? endDateFrom, DateTime? endDateTo);
     }
 }

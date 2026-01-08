@@ -26,26 +26,26 @@ namespace MongoDBCore.Repositories.Consumer
             var message = context.Message;
             string cacheKey = $"policy:{message.PolicyId}";
 
-            if (message.ActionType == "CANCEL")
-            {
-                // 1. Cập nhật MongoDB
-                await _repository.UpdateCancelStatusAsync(message.PolicyId, message.LastNotes);
+            // Dùng ToUpper() để so sánh cho chắc chắn
+            string action = message.ActionType?.ToUpper();
 
-                // 2. Xóa Cache ngay lập tức để người dùng không thấy trạng thái cũ
-                await _cacheService.RemoveAsync(cacheKey);
-            }
-            else if (message.ActionType == "RENEW")
+            if (action == "CANCEL")
             {
-                // 1. Cập nhật MongoDB
+                await _repository.UpdateCancelStatusAsync(message.PolicyId, message.LastNotes);
+            }
+            else if (action == "RENEW")
+            {
                 await _repository.UpdateRenewStatusAsync(
                     message.PolicyId,
                     message.EndDate,
                     message.TotalPremium,
                     message.LastNotes);
-
-                // 2. Xóa Cache
-                await _cacheService.RemoveAsync(cacheKey);
             }
+
+            // Đưa ra ngoài này để bất kể Action nào cũng xóa Cache cho an toàn
+            await _cacheService.RemoveAsync(cacheKey);
+
+            Console.WriteLine($"[Consumer] Action {action} processed for Policy {message.PolicyId}. Cache cleared.");
         }
     }
 }

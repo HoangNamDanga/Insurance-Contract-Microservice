@@ -10,8 +10,8 @@ namespace OracleSQLCore.Models.DTOs
     public class RenewPolicyDto
     {
         public int PolicyId { get; set; }
-        public DateTime NewEndDate { get; set; }
-        public decimal AdditionalPremium { get; set; }
-        public string Notes { get; set; }
+        public DateTime NewEndDate { get; set; } 
+        public decimal AdditionalPremium { get; set; } 
+        public string Notes { get; set; } = string.Empty;
     }
 }

@@ -237,24 +237,13 @@ builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
 
 #region Đăng ký gRPC và GraphQL
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(); //Đăng ký các dịch vụ cần thiết để ứng dụng có thể hiểu và xử lý các file .proto cũng như các Service gRPC.
 
-builder.Services
+builder.Services // Đăng ký engine của HotChocolate (hoặc GraphQL library bạn dùng) để xử lý các truy vấn GraphQL thông qua class Query
     .AddGraphQLServer()
     .AddQueryType<CoNhungNgayMicroservice.GraphQL.Query>()
     .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = true);
 
-
-
-//builder.WebHost.ConfigureKestrel(options =>
-//{
-//    // Lắng nghe trên cổng 8080 cho cả HTTP/1.1 và HTTP/2
-//    options.ListenAnyIP(8080, listenOptions =>
-//    {
-//        // Cho phép Kestrel tự động nhận diện giao thức (HTTP/1 hoặc HTTP/2)
-//        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
-//    });
-//});
 #endregion
 
 
@@ -279,11 +268,11 @@ app.MapHealthChecks("/health");
 
 
 
-#region Kích hoạt Endpoints
-app.MapGraphQL();
-app.MapGrpcService<CoNhungNgayMicroservice.Services.PolicyGrpcService>();
+#region Kích hoạt Endpoints , Cấu hình Middleware Pipeline
+app.MapGraphQL(); // request HTTP POST gửi đến đây, engine GraphQL sẽ nhảy vào xử lý
+app.MapGrpcService<CoNhungNgayMicroservice.Services.PolicyGrpcService>(); // Thiết lập một Endpoint để xử lý các request gRPC (HTTP/2 binary) gửi đến Server. Nó kết nối file .proto với logic thực tế trong class PolicyGrpcService
 
 // Thêm dòng này để hỗ trợ gọi gRPC từ các công cụ cũ hoặc trình duyệt (nếu cần)
-app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client.");
+app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client."); // một Middleware xử lý yêu cầu GET đơn giản tại trang chủ. Nó đóng vai trò như một "biển báo" để nhắc nhở người dùng rằng họ đang truy cập vào một Server gRPC.
 #endregion
 app.Run();
