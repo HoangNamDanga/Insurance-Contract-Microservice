@@ -13,7 +13,7 @@ namespace Shared.Contracts.Events
         public string PolicyNumber { get; set; } = string.Empty;
 
         //thong tin nghiep vu thay doi
-        public string ActionType { get; set; } // "CREATE", "UPDATE", "RENEW", "CANCEL"
+        public string? ActionType { get; set; } // "CREATE", "UPDATE", "RENEW", "CANCEL"
         public string Status { get; set; } = string.Empty;
         public DateTime EndDate { get; set; }
         public decimal TotalPremium { get; set; }

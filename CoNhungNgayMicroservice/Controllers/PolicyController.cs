@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Dapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDBCore.Interfaces;
 using OracleSQLCore.Models.DTOs;
+using OracleSQLCore.Repositories.BackgroundServices;
 using OracleSQLCore.Services;
+using System.Data;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -172,6 +175,23 @@ namespace CoNhungNgayMicroservice.Controllers
             }catch(Exception ex)
             {
                 return StatusCode(500, $"Lỗi khi tìm kiếm: {ex.Message}" );
+            }
+        }
+
+        [HttpPost("trigger-expire")]
+        public async Task<IActionResult> Trigger([FromServices] PolicyWorker worker)
+        {
+            try
+            {
+                // Gọi hàm thực thi trọn gói của Worker (bao gồm Oracle -> RabbitMQ -> Email)
+                await worker.ExecuteInternal();
+
+                return Ok(new { message = "Đã kích hoạt quét trọn gói và gửi thông báo thành công." });
+            }
+            catch (Exception ex)
+            {
+                // Trả về lỗi chi tiết nếu có vấn đề xảy ra
+                return StatusCode(500, $"Lỗi hệ thống: {ex.Message}");
             }
         }
     }

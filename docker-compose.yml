@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: conhungngay-api
     ports:
-      - "8080:8080" # Cổng cho Swagger/REST (HTTP/1)
-      - "8081:8081"  # Cổng cho gRPC (HTTP/2)
+      - "8080:8080" # Swagger/REST
+      - "8081:8081" # gRPC
     depends_on:
       oracle:
         condition: service_healthy
@@ -18,17 +18,24 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      mailhog: # Chờ mailhog sẵn sàng
+        condition: service_started
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
-      # Endpoint cho REST/Swagger
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1
-      # Endpoint cho gRPC
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2
+      
+      # ===== EMAIL SETTINGS =====
+      # Lưu ý: SmtpServer phải là "mailhog" (tên service bên dưới)
+      - EmailSettings__SmtpServer=mailhog
+      - EmailSettings__SmtpPort=1025
+      - EmailSettings__SenderName=Bao Hiem Co Nhung Ngay
+      - EmailSettings__SenderEmail=no-reply@conhungngay.com
+
       # ===== REDIS =====
-      # Lưu ý: Pass ở đây phải khớp với requirepass của service redis bên dưới
       - Redis__ConnectionString=redis:6379,password=myredispw123
 
       # ===== MONGODB =====
@@ -40,7 +47,6 @@ services:
       - MongoDBSettings__PolicyCollectionName=Policy
 
       # ===== ORACLE =====
-      # Password ở đây phải khớp với ORACLE_PASSWORD bên dưới
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
 
       # ===== RABBITMQ =====
@@ -82,7 +88,6 @@ services:
     ports:
       - "1522:1521"
     environment:
-      # Đây là biến quan trọng nhất để sửa lỗi "specify a password" của bạn
       - ORACLE_PASSWORD=mypassword123
     volumes:
       - oracle_data:/opt/oracle/oradata
@@ -102,6 +107,17 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    networks:
+      - backend
+
+  # ===== THÊM MỚI SERVICE MAILHOG =====
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    restart: always
+    ports:
+      - "1025:1025" # Cổng SMTP để API gửi mail vào
+      - "8025:8025" # Cổng Web UI để bạn xem mail
     networks:
       - backend
 

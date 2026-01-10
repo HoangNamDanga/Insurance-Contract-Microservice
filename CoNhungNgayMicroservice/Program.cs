@@ -15,6 +15,10 @@ using Microsoft.OpenApi;
 using MongoDBCore.Services.CachingImp;
 using MongoDBCore.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using OracleSQLCore.Repositories.BackgroundServices;
+using System.Data;
+using OracleSQLCore.Repositories.Email;
+using Shared.Contracts.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +74,24 @@ builder.Services.AddScoped<IMongoCollection<PolicyDto>>(sp =>
     var settings = sp.GetRequiredService<MongoDbSettings>();
     return database.GetCollection<PolicyDto>(settings.PolicyCollectionName);
 });
+
+
+#region PolicyWorker
+
+// ĐĂNG KÝ IDbConnection cho toàn bộ ứng dụng (Controller và Worker đều dùng được)
+builder.Services.AddTransient<IDbConnection>(sp =>
+    new Oracle.ManagedDataAccess.Client.OracleConnection(oracleConnectionString));
+// 2. ĐĂNG KÝ PolicyWorker dưới dạng Singleton (Để Controller có thể Inject được)
+builder.Services.AddSingleton<PolicyWorker>();
+
+// 3. ĐĂNG KÝ PolicyWorker chạy ngầm (Sử dụng chung instance với bước 2)
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PolicyWorker>());
+#endregion
+
+
+#region Email
+builder.Services.AddScoped<IEmailService, EmailService>();
+#endregion
 
 #endregion
 
@@ -183,6 +205,8 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<PolicyCreatedConsumer>();
     x.AddConsumer<InsuranceTypeCreateConsumer>(); // Thêm dòng này cho Insurance
     x.AddConsumer<AgentCreatedConsumer>(); // Thêm dòng này cho Insurance
+
+    x.AddConsumer<PolicyExpiredConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL
     x.UsingRabbitMq((context, cfg) =>
     {
         // THÊM DÒNG NÀY: Áp d?ng cho m?i Endpoint bên d??i
@@ -220,6 +244,13 @@ builder.Services.AddMassTransit(x =>
         cfg.ReceiveEndpoint("policy-changed-sync-queue", e =>
         {
             e.ConfigureConsumer<PolicyChangedConsumer>(context);
+        });
+
+        // --- 2. THÊM ENDPOINT MỚI: Cho việc gửi Email thông báo hết hạn ---
+        cfg.ReceiveEndpoint("policy-expired-email-queue", e =>
+        {
+            // Kết nối hàng đợi này với Consumer xử lý Email
+            e.ConfigureConsumer<PolicyExpiredConsumer>(context);
         });
     });
 });
