@@ -206,7 +206,8 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<InsuranceTypeCreateConsumer>(); // Thêm dòng này cho Insurance
     x.AddConsumer<AgentCreatedConsumer>(); // Thêm dòng này cho Insurance
 
-    x.AddConsumer<PolicyExpiredConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL
+    x.AddConsumer<PolicyExpiredConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL nhắc phí
+    x.AddConsumer<PolicyPaymentDueConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL TÍNH PHÍ
     x.UsingRabbitMq((context, cfg) =>
     {
         // THÊM DÒNG NÀY: Áp d?ng cho m?i Endpoint bên d??i
@@ -251,6 +252,11 @@ builder.Services.AddMassTransit(x =>
         {
             // Kết nối hàng đợi này với Consumer xử lý Email
             e.ConfigureConsumer<PolicyExpiredConsumer>(context);
+        });
+        //Nhắc phí
+        cfg.ReceiveEndpoint("policy-payment-due-queue", e =>
+        {
+            e.ConfigureConsumer<PolicyPaymentDueConsumer>(context);
         });
     });
 });

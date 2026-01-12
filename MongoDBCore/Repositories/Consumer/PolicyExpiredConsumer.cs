@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 
 namespace MongoDBCore.Repositories.Consumer
 {
+    //Consumer cho NGHIỆP VỤ HẾT HẠN
     public class PolicyExpiredConsumer : IConsumer<PolicyExpiredEvent>
     {
         private readonly ILogger<PolicyExpiredConsumer> _logger;

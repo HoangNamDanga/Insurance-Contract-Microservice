@@ -21,6 +21,7 @@ services:
       mailhog: # Chờ mailhog sẵn sàng
         condition: service_started
     environment:
+      - TZ=Asia/Ho_Chi_Minh  # <--- THÊM DÒNG NÀY
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
@@ -88,6 +89,7 @@ services:
     ports:
       - "1522:1521"
     environment:
+      - TZ=Asia/Ho_Chi_Minh  # <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ GIỜ VỚI WORKER
       - ORACLE_PASSWORD=mypassword123
     volumes:
       - oracle_data:/opt/oracle/oradata
