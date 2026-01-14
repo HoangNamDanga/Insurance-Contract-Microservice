@@ -237,6 +237,60 @@ namespace OracleSQLCore.Repositories
             return eventData;
         }
 
+        public async Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId)
+        {
+            using var conn = new OracleConnection(_connectionString);
+            await conn.OpenAsync();
+
+            // Sử dụng Transaction để đảm bảo nếu Update thành công thì mới lấy dữ liệu
+            using var trans = conn.BeginTransaction();
+            try
+            {
+                // 1. Update Oracle (Kích hoạt Trigger TRG_AFTER_PAYMENT_SUCCESS tự tính hoa hồng)
+                string updateSql = @"UPDATE INSURANCE_USER.DHN_PAYMENT 
+                             SET STATUS = 'Success' 
+                             WHERE POLICY_ID = :id AND STATUS = 'Pending'";
+
+                int affected = await conn.ExecuteAsync(updateSql, new { id = policyId }, trans);
+
+                if (affected > 0)
+                {
+                    // 2. Lấy dữ liệu Payload đầy đủ (Gom từ 4 bảng: Policy, Customer, Agent, Commission)
+                    // SQL này đảm bảo lấy đúng bản ghi hoa hồng vừa được Trigger tạo ra
+                    string selectSql = @"
+                SELECT 
+                    p.POLICY_ID as PolicyId, 
+                    p.POLICY_NUMBER as PolicyNumber, 
+                    cust.FULL_NAME as CustomerName,
+                    p.AGENT_ID as AgentId, 
+                    age.FULL_NAME as AgentName,
+                    pm.AMOUNT as TotalPayment, 
+                    ac.COMMISSION_AMOUNT as CommissionAmount,
+                    ac.STATUS as Status,
+                    TO_CHAR(ac.CALCULATED_DATE, 'YYYY-MM-DD""T""HH24:MI:SS') as SyncDate
+                    FROM INSURANCE_USER.DHN_POLICY p
+                    JOIN INSURANCE_USER.DHN_CUSTOMER cust ON p.CUSTOMER_ID = cust.CUSTOMER_ID
+                    JOIN INSURANCE_USER.DHN_AGENT age ON p.AGENT_ID = age.AGENT_ID
+                    JOIN INSURANCE_USER.DHN_PAYMENT pm ON p.POLICY_ID = pm.POLICY_ID
+                    JOIN INSURANCE_USER.DHN_AGENT_COMMISSION ac ON p.POLICY_ID = ac.POLICY_ID
+                    WHERE p.POLICY_ID = :id 
+                      AND pm.STATUS = 'Success'
+                    ORDER BY ac.CALCULATED_DATE DESC";
+
+                    var result = await conn.QueryFirstOrDefaultAsync<CommissionSyncDto>(selectSql, new { id = policyId }, trans);
+
+                    trans.Commit(); // Hoàn tất giao dịch
+                    return result;
+                }
+
+                return null; // Không có bản ghi nào được update (có thể đã success trước đó)
+            }
+            catch (Exception)
+            {
+                trans.Rollback();
+                throw;
+            }
+        }
     }
 
 }

@@ -116,5 +116,11 @@ namespace OracleSQLCore.Services.Imp
             }
             return resultEvent;
         }
+
+        public async Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId)
+        {
+            // Điều hướng: Gọi Repo để xử lý dưới Oracle và lấy dữ liệu hoa hồng
+            return await _policyRepository.ConfirmAndGetCommissionAsync(policyId);
+        }
     }
 }

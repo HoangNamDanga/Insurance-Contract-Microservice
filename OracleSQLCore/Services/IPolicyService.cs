@@ -26,5 +26,10 @@ namespace OracleSQLCore.Services
         // --- THÊM MỚI ---
         Task<PolicyChangedEvent> RenewAsync(RenewPolicyDto request);
         Task<PolicyChangedEvent> CancelAsync(CancelPolicyDto request);
+
+
+
+        // Hàm gọi URL HTTP POST sang hệ thống MongoDB , nghiệp vụ hoa hồng commisstion
+        Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId);
     }
 }

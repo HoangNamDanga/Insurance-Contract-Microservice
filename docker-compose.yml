@@ -46,7 +46,7 @@ services:
       - MongoDBSettings__InsuranceTypeCollectionName=InsuranceTypes
       - MongoDBSettings__AgentCollectionName=Agents
       - MongoDBSettings__PolicyCollectionName=Policy
-
+      - MongoDBSettings__CommissionsCollectionName=Commissions
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
 

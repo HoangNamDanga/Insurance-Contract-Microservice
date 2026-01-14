@@ -6,6 +6,7 @@ using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Repositories.BackgroundServices;
 using OracleSQLCore.Services;
 using System.Data;
+using System.Net.Http;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace CoNhungNgayMicroservice.Controllers
     {
         private readonly IPolicyService _policyService;
         private readonly IPolicyRepository _policyRepository;
-        public PolicyController(IPolicyService policyService, IPolicyRepository policyRepository)
+        private readonly IHttpClientFactory _httpClientFactory;
+        public PolicyController(IPolicyService policyService, IPolicyRepository policyRepository, IHttpClientFactory httpClientFactory)
         {
             _policyService = policyService;
             _policyRepository = policyRepository;
+            _httpClientFactory = httpClientFactory;
         }
 
         [HttpGet]
@@ -194,5 +197,63 @@ namespace CoNhungNgayMicroservice.Controllers
                 return StatusCode(500, $"Lỗi hệ thống: {ex.Message}");
             }
         }
+
+
+
+        [HttpPost("confirm/{policyId}")] // api này sẽ đồng bộ với CommisstionMongo Controller
+        public async Task<IActionResult> ConfirmAndSync(int policyId)
+        {
+            // BƯỚC 1: Xử lý tại Oracle (Trigger tự động tính hoa hồng bên trong Repository)
+            // Hàm này trả về CommissionSyncDto chứa: PolicyId, AgentName, CustomerName, CommissionAmount, v.v.
+            var syncData = await _policyService.ConfirmAndGetCommissionAsync(policyId);
+
+            if (syncData == null)
+            {
+                return BadRequest("Không thể xác nhận thanh toán hoặc hợp đồng đã được xử lý trước đó.");
+            }
+
+            // BƯỚC 2: Sử dụng HttpClient từ Factory (có cấu hình Polly để Retry nếu mạng lag)
+            var client = _httpClientFactory.CreateClient("MongoSyncClient");
+
+            // URL phía MongoDB nhận dữ liệu hoa hồng
+            string mongoUrl = "http://api:8080/api/CommissionMongo/sync-commission";
+
+            try
+            {
+                // Gửi toàn bộ cục "syncData" (đã làm giàu dữ liệu) sang MongoDB
+                var response = await client.PostAsJsonAsync(mongoUrl, syncData);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return Ok(new
+                    {
+                        Status = "Success",
+                        Message = "Xác nhận thanh toán và đồng bộ hoa hồng thành công!",
+                        Data = syncData
+                    });
+                }
+                // Trường hợp API Mongo phản hồi lỗi (400, 500...)
+                var errorBody = await response.Content.ReadAsStringAsync();
+                return Accepted(new
+                {
+                    Status = "PartialSuccess",
+                    Warning = $"Oracle đã lưu nhưng Mongo từ chối: {errorBody}",
+                    Data = syncData
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                // Trường hợp Service Mongo chết hẳn hoặc timeout sau khi Polly đã retry
+                return Accepted(new
+                {
+                    Status = "PartialSuccess",
+                    Warning = $"Lỗi kết nối Mongo service: {ex.Message}. Dữ liệu Oracle vẫn được bảo toàn.",
+                    Data = syncData
+                });
+            }
+        }
+
+
+
     }
 }

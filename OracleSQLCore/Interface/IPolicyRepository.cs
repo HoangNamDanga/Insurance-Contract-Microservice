@@ -26,5 +26,10 @@ namespace OracleSQLCore.Interface
         // --- THÊM MỚI ---
         Task<PolicyChangedEvent> RenewAsync(RenewPolicyDto request);
         Task<PolicyChangedEvent> CancelAsync(CancelPolicyDto request);
+
+        //API tinh hoa hong goi trigger
+        Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId);
+
+
     }
 }

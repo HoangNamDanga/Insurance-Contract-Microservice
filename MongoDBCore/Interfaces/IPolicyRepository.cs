@@ -25,5 +25,7 @@ namespace MongoDBCore.Interfaces
         // --- BỔ SUNG NGHIỆP VỤ SEARCH INDEXING ---
         // Tìm kiếm theo nhiều tiêu chí: Tên khách hàng, Trạng thái, và Khoảng ngày hết hạn
         Task<List<PolicyDto>> SearchAsync(string customerName, string status, DateTime? endDateFrom, DateTime? endDateTo);
+
+
     }
 }

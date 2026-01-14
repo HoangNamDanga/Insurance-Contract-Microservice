@@ -122,6 +122,7 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 // End
 // ??ng ký cho MongoDB
 #region MongoDb, Repo
+builder.Services.AddScoped<MongoDBCore.Interfaces.ICommissionRepository, MongoDBCore.Repositories.CommissionRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IPolicyRepository, MongoDBCore.Repositories.PolicyRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCore.Repositories.CustomerRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IAgentRepository, MongoDBCore.Repositories.AgentRepository>();
