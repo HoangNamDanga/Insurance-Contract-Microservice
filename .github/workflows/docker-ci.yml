@@ -33,4 +33,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mongo-consumer:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/insurance:latest

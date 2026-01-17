@@ -7,6 +7,7 @@ using System.Net.WebSockets;
 
 namespace Insurance.Tests
 {
+
     public class PolicyChangedConsumerTests
     {
         [Fact]

@@ -47,6 +47,7 @@ services:
       - MongoDBSettings__AgentCollectionName=Agents
       - MongoDBSettings__PolicyCollectionName=Policy
       - MongoDBSettings__CommissionsCollectionName=Commissions
+      - MongoDBSettings__ClaimsCollectionName=Claims
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
 

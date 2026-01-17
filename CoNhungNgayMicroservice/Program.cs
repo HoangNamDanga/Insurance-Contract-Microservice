@@ -110,6 +110,10 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IPolicyRepository>(
     _ => new OracleSQLCore.Repositories.PolicyRepository(oracleConnectionString)
 );
 
+builder.Services.AddScoped<OracleSQLCore.Interface.IClaimRepository>(
+    _ => new OracleSQLCore.Repositories.ClaimRepository(oracleConnectionString)
+);
+
 
 
 builder.Services.AddScoped<OracleSQLCore.Services.ICustomerService, CustomerService>();
@@ -118,6 +122,7 @@ builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n 
     new AgentRepository(oracleConnectionString!));
 builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
+builder.Services.AddScoped<IClaimService, ClaimService>();
 #endregion
 // End
 // ??ng ký cho MongoDB
@@ -128,6 +133,7 @@ builder.Services.AddScoped<MongoDBCore.Interfaces.ICustomerRepository, MongoDBCo
 builder.Services.AddScoped<MongoDBCore.Interfaces.IAgentRepository, MongoDBCore.Repositories.AgentRepository>();
 builder.Services.AddScoped<MongoDBCore.Services.ICustomerService, MongoDBCore.Services.Imp.CustomerService>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IInsuranceRepository, MongoDBCore.Repositories.InsuranceTypeRepository>();
+builder.Services.AddScoped<MongoDBCore.Interfaces.IClaimRepository, MongoDBCore.Repositories.ClaimRepository>();
 builder.Services.AddSingleton<IMongoClient>(
     _ => new MongoClient(mongoConnectionString)
 );

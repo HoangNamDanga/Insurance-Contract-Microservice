@@ -22,6 +22,9 @@ namespace MongoDBCore.Repositories.Consumer
             _emailService = emailService;
         }
 
+
+        //luồng này chưa đồng bộ và lưu redis
+        // hệ thống thực tế, thì sẽ cần đồng bộ , và lưu redis
         public async Task Consume(ConsumeContext<PolicyExpiredEvent> context)
         {
             foreach(var policy in context.Message.ExpiredPolicies)
