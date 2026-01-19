@@ -2,9 +2,8 @@ version: "3.9"
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # --- ĐÃ SỬA: Lấy image từ Docker Hub thay vì build tại chỗ ---
+    image: hoangnamdang/insurance:latest
     container_name: conhungngay-api
     ports:
       - "8080:8080" # Swagger/REST
@@ -18,10 +17,10 @@ services:
         condition: service_started
       redis:
         condition: service_started
-      mailhog: # Chờ mailhog sẵn sàng
+      mailhog: 
         condition: service_started
     environment:
-      - TZ=Asia/Ho_Chi_Minh  # <--- THÊM DÒNG NÀY
+      - TZ=Asia/Ho_Chi_Minh
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
@@ -30,7 +29,6 @@ services:
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2
       
       # ===== EMAIL SETTINGS =====
-      # Lưu ý: SmtpServer phải là "mailhog" (tên service bên dưới)
       - EmailSettings__SmtpServer=mailhog
       - EmailSettings__SmtpPort=1025
       - EmailSettings__SenderName=Bao Hiem Co Nhung Ngay
@@ -48,6 +46,7 @@ services:
       - MongoDBSettings__PolicyCollectionName=Policy
       - MongoDBSettings__CommissionsCollectionName=Commissions
       - MongoDBSettings__ClaimsCollectionName=Claims
+
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
 
@@ -90,7 +89,7 @@ services:
     ports:
       - "1522:1521"
     environment:
-      - TZ=Asia/Ho_Chi_Minh  # <--- THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ GIỜ VỚI WORKER
+      - TZ=Asia/Ho_Chi_Minh
       - ORACLE_PASSWORD=mypassword123
     volumes:
       - oracle_data:/opt/oracle/oradata
@@ -113,14 +112,13 @@ services:
     networks:
       - backend
 
-  # ===== THÊM MỚI SERVICE MAILHOG =====
   mailhog:
     image: mailhog/mailhog
     container_name: mailhog
     restart: always
     ports:
-      - "1025:1025" # Cổng SMTP để API gửi mail vào
-      - "8025:8025" # Cổng Web UI để bạn xem mail
+      - "1025:1025"
+      - "8025:8025"
     networks:
       - backend
 
