@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 namespace Insurance.Tests
 {
     //Ci/CD kiểu Integration Test : Loại viết test cho lớp logic Database
+    // Test
     public class ClaimRepositoryTests
     {
         // Chú ý: Dùng Connection String tới Docker Oracle đang chạy trên máy bạn (cổng 1522)
