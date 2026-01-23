@@ -122,5 +122,25 @@ namespace OracleSQLCore.Services.Imp
             // Điều hướng: Gọi Repo để xử lý dưới Oracle và lấy dữ liệu hoa hồng
             return await _policyRepository.ConfirmAndGetCommissionAsync(policyId);
         }
+
+        public async Task<PaymentConfirmedEvent> ConfirmPaymentAsync(int paymentId)
+        {
+            // 1. Gọi Repository để thực thi Procedure trong Oracle 
+            // (Bao gồm: Confirm Payment, Active Policy, Calc Commission, Update Agent Rank)
+            var resultEvent = await _policyRepository.ConfirmPaymentAsync(paymentId);
+
+            if (resultEvent != null)
+            {
+                // 2. Bắn Event sang RabbitMQ bằng IPublishEndpoint (MassTransit)
+                // Chúng ta dùng Polly Retry để đảm bảo Event luôn được gửi đi nếu RabbitMQ tạm thời mất kết nối
+                await _retryPolicy.ExecuteAsync(async () =>
+                {
+                    await _publishEndpoint.Publish(resultEvent);
+                    // Lưu ý: Event này sẽ được các Consumer (MongoSyncConsumer, EmailConsumer...) xử lý độc lập
+                });
+            }
+
+            return resultEvent;
+        }
     }
 }

@@ -17,11 +17,13 @@ namespace CoNhungNgayMicroservice.Controllers
         private readonly IPolicyService _policyService;
         private readonly IPolicyRepository _policyRepository;
         private readonly IHttpClientFactory _httpClientFactory;
-        public PolicyController(IPolicyService policyService, IPolicyRepository policyRepository, IHttpClientFactory httpClientFactory)
+        private readonly ILogger<PolicyController> _logger; // Khai báo thêm logger
+        public PolicyController(ILogger<PolicyController> logger,IPolicyService policyService, IPolicyRepository policyRepository, IHttpClientFactory httpClientFactory)
         {
             _policyService = policyService;
             _policyRepository = policyRepository;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -181,6 +183,49 @@ namespace CoNhungNgayMicroservice.Controllers
             }
         }
 
+
+        /// <summary>
+        /// API Xác nhận thanh toán phí bảo hiểm
+        /// </summary>
+        /// <param name="paymentId">ID của bản ghi thanh toán (DHN_PAYMENT)</param> // RabbitMQ
+        [HttpPost("confirm-payment-transaction/{paymentId:int}")]
+        public async Task<IActionResult> ConfirmPayment(int paymentId)
+        {
+            _logger.LogInformation("Bắt đầu xử lý xác nhận thanh toán cho PaymentID: {PaymentId}", paymentId);
+
+            try
+            {
+                // Gọi Service để thực hiện chuỗi nghiệp vụ tại Oracle và bắn Event
+                var result = await _policyService.ConfirmPaymentAsync(paymentId);
+
+                if (result == null)
+                {
+                    _logger.LogWarning("Không tìm thấy thông tin thanh toán hoặc xử lý thất bại cho ID: {PaymentId}", paymentId);
+                    return NotFound(new { message = "Không tìm thấy thông tin thanh toán hoặc giao dịch không hợp lệ." });
+                }
+
+                // Trả về thành công cùng thông tin tóm tắt
+                return Ok(new
+                {
+                    message = "Xác nhận thanh toán thành công.",
+                    policyId = result.PolicyId,
+                    status = result.NewPolicyStatus,
+                    agentRank = result.NewAgentLevel,
+                    commission = result.CommissionAmount,
+                    processedAt = result.ProcessedAt
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi nghiêm trọng khi xác nhận thanh toán cho ID: {PaymentId}", paymentId);
+
+                // Trả về lỗi 500 nếu có sự cố hệ thống
+                return StatusCode(500, new { message = "Đã xảy ra lỗi hệ thống khi xử lý thanh toán.", details = ex.Message });
+            }
+        }
+
+
+
         [HttpPost("trigger-expire")]
         public async Task<IActionResult> Trigger([FromServices] PolicyWorker worker)
         {
@@ -200,7 +245,7 @@ namespace CoNhungNgayMicroservice.Controllers
 
 
 
-        [HttpPost("confirm/{policyId}")] // api này sẽ đồng bộ với CommisstionMongo Controller
+        [HttpPost("confirm/{policyId}")] // api này sẽ đồng bộ với CommisstionMongo Controller HTTP
         public async Task<IActionResult> ConfirmAndSync(int policyId)
         {
             // BƯỚC 1: Xử lý tại Oracle (Trigger tự động tính hoa hồng bên trong Repository)

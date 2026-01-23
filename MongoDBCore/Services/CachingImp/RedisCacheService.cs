@@ -52,6 +52,8 @@ namespace MongoDBCore.Services.CachingImp
             await _cache.RemoveAsync(key);
         }
 
+        //Hàm này có thể cài giờ cache tồn tại
+
         public async Task SetAsync<T>(string key, T value, TimeSpan? expiry = null)
         {
             var options = new DistributedCacheEntryOptions

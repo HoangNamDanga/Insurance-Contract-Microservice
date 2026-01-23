@@ -20,6 +20,7 @@ namespace OracleSQLCore.Repositories.BackgroundServices
             _scopeFactory = scopeFactory;
         }
 
+        //Thiếu : Cần bổ sung Consumer cho nghiệp vụ này. pushlish bắn sang cho mongoDb consumer để gọi upsert cập nhật dữ liệu mới nhất bằng lệnh remove của mongoDb redis
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation(">>> PolicyWorker ĐÃ KHỞI CHẠY: Chế độ quét định kỳ 00:00 hàng ngày <<<");

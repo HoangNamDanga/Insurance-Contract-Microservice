@@ -191,42 +191,50 @@ namespace OracleSQLCore.Repositories
             using var conn = new OracleConnection(_connectionString);
             await conn.OpenAsync();
 
+            // THÊM: Bắt đầu Transaction
+            using var trans = conn.BeginTransaction();
+
             try
             {
                 var p = new DynamicParameters();
                 p.Add("P_POLICY_ID", request.PolicyId);
-                p.Add("P_NEW_END_DATE", request.NewEndDate);
-                p.Add("P_ADDITIONAL_PREMIUM", request.AdditionalPremium);
+                // THÊM: Định nghĩa rõ kiểu Date
+                p.Add("P_NEW_END_DATE", request.NewEndDate, DbType.Date);
+                p.Add("P_ADDITIONAL_PREMIUM", request.AdditionalPremium, DbType.Decimal);
                 p.Add("P_NOTES", request.Notes);
 
-                // Gọi Procedure Renew đã có logic kiểm tra trạng thái
-                await conn.ExecuteAsync("INSURANCE_USER.DHN_POLICY_PKG.RENEW_POLICY", p, commandType: CommandType.StoredProcedure);
+                // Gọi Procedure (Truyền trans vào)
+                await conn.ExecuteAsync("INSURANCE_USER.DHN_POLICY_PKG.RENEW_POLICY",
+                                        p,
+                                        transaction: trans,
+                                        commandType: CommandType.StoredProcedure);
 
-                // Lấy lại dữ liệu đã update (EndDate mới, Premium mới) để gửi sang MongoDB
-                return await EnrichChangedDate(conn, request.PolicyId, "RENEW", request.Notes);
+                // Lấy dữ liệu (Truyền trans vào để đọc dữ liệu đang trong transaction)
+                var result = await EnrichChangedDate(conn, request.PolicyId, "RENEW", request.Notes, trans);
+
+                // THÊM: Xác nhận thành công
+                trans.Commit();
+
+                return result;
             }
-            catch (OracleException ex)
+            catch (Exception ex)
             {
-                // Trả về lỗi nghiệp vụ từ Oracle (Ví dụ: ORA-20003)
-                throw new Exception($"Lỗi nghiệp vụ bảo hiểm: {ex.Message}");
+                // THÊM: Nếu lỗi thì hủy bỏ toàn bộ
+                trans.Rollback();
+                throw new Exception($"Lỗi gia hạn: {ex.Message}");
             }
         }
 
 
         // --- HELPER mới cho PolicyChangedEvent ---
-        public async Task<PolicyChangedEvent> EnrichChangedDate(OracleConnection conn, int id, string action, string notes)
+        public async Task<PolicyChangedEvent> EnrichChangedDate(OracleConnection conn, int id, string action, string notes, IDbTransaction trans = null)
         {
-            // Câu lệnh SQL này đã rất chuẩn vì lấy cả EndDate và TotalPremium mới nhất
-            string sql = @"
-            SELECT POLICY_ID as PolicyId, 
-                   POLICY_NUMBER as PolicyNumber, 
-                   STATUS as Status, 
-                   END_DATE as EndDate, 
-                   PREMIUM_AMOUNT as TotalPremium
-            FROM INSURANCE_USER.DHN_POLICY 
-            WHERE POLICY_ID = :id";
+            string sql = @"SELECT POLICY_ID as PolicyId, POLICY_NUMBER as PolicyNumber, STATUS as Status, 
+                          END_DATE as EndDate, PREMIUM_AMOUNT as TotalPremium
+                   FROM INSURANCE_USER.DHN_POLICY WHERE POLICY_ID = :id";
 
-            var eventData = await conn.QuerySingleOrDefaultAsync<PolicyChangedEvent>(sql, new { id });
+            // Truyền transaction vào đây
+            var eventData = await conn.QuerySingleOrDefaultAsync<PolicyChangedEvent>(sql, new { id }, transaction: trans);
 
             if (eventData != null)
             {
@@ -289,6 +297,74 @@ namespace OracleSQLCore.Repositories
             {
                 trans.Rollback();
                 throw;
+            }
+        }
+
+        public async Task<PaymentConfirmedEvent> ConfirmPaymentAsync(int paymentId)
+        {
+            using (var conn = new OracleConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                using (var trans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 1. Thực thi Procedure tổng hợp trong Package
+                        // Bước này cập nhật Payment, Policy, Tính Commission và Xếp hạng Agent
+                        var p = new DynamicParameters();
+                        p.Add("P_PAYMENT_ID", paymentId, DbType.Int32, ParameterDirection.Input);
+
+                        await conn.ExecuteAsync(
+                            "INSURANCE_USER.DHN_POLICY_PKG.CONFIRM_PAYMENT",
+                            p,
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        // 2. Lấy dữ liệu mới nhất để bắn Event (Đồng bộ sang Mongo/RabbitMQ)
+                        // Chúng ta Query ngay trong Transaction để đảm bảo dữ liệu vừa cập nhật là chính xác
+                        string sqlGetInfo = @"
+                            SELECT 
+                                pay.PAYMENT_ID as PaymentId,
+                                pol.POLICY_ID as PolicyId,
+                                pol.POLICY_NUMBER as PolicyNumber,
+                                cus.FULL_NAME as CustomerName,
+                                pol.STATUS as NewPolicyStatus,
+                                ag.AGENT_ID as AgentId,
+                                ag.FULL_NAME as AgentName,
+                                ag.AGENT_LEVEL as NewAgentLevel,
+                                pay.AMOUNT as TotalPayment,
+                                com.COMMISSION_AMOUNT as CommissionAmount
+                            FROM INSURANCE_USER.DHN_PAYMENT pay
+                            JOIN INSURANCE_USER.DHN_POLICY pol ON pay.POLICY_ID = pol.POLICY_ID
+                            JOIN INSURANCE_USER.DHN_CUSTOMER cus ON pol.CUSTOMER_ID = cus.CUSTOMER_ID
+                            JOIN INSURANCE_USER.DHN_AGENT ag ON pol.AGENT_ID = ag.AGENT_ID
+                            LEFT JOIN INSURANCE_USER.DHN_AGENT_COMMISSION com ON pol.POLICY_ID = com.POLICY_ID
+                            WHERE pay.PAYMENT_ID = :paymentId";
+
+                        var eventData = await conn.QueryFirstOrDefaultAsync<PaymentConfirmedEvent>(
+                            sqlGetInfo,
+                            new { paymentId },
+                            transaction: trans
+                        );
+
+                        if (eventData != null)
+                        {
+                            eventData.ProcessedAt = DateTime.Now;
+                        }
+
+                        // 3. Commit Giao dịch
+                        trans.Commit();
+
+                        return eventData;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Rollback nếu có bất kỳ lỗi nào từ phía Oracle (ví dụ: lỗi logic trong procedure)
+                        trans.Rollback();
+                        throw new Exception($"Lỗi thực thi ConfirmPayment cho PaymentId {paymentId}: {ex.Message}");
+                    }
+                }
             }
         }
     }
