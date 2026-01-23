@@ -28,8 +28,22 @@ namespace OracleSQLCore.Interface
         Task<PolicyChangedEvent> CancelAsync(CancelPolicyDto request);
 
         //API tinh hoa hong goi trigger
+        // --- CÁC HÀM MỚI ---
+
+        /// <summary>
+        /// Xác nhận thanh toán tổng hợp: 
+        /// 1. Cập nhật Payment -> Success
+        /// 2. Cập nhật Policy -> Active
+        /// 3. Tính hoa hồng cho Đại lý
+        /// 4. Cập nhật Hạng đại lý (Hierarchy)
+        /// </summary>
+        /// <returns>Trả về Event chứa thông tin thay đổi để bắn vào RabbitMQ/Mongo</returns>
+        Task<PaymentConfirmedEvent> ConfirmPaymentAsync(int paymentId);
+
+        /// <summary>
+        /// API lấy thông tin hoa hồng sau khi đã được trigger tính toán
+        /// (Dùng để hiển thị hoặc đối soát ngay lập tức)
+        /// </summary>
         Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId);
-
-
     }
 }

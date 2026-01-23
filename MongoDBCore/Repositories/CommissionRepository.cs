@@ -26,6 +26,8 @@ namespace MongoDBCore.Repositories
 
             _commisstionCollectionName = mongoDatabase.GetCollection<AgentCommissionMongo>(settings.CommissionsCollectionName);
         }
+
+        //Repo này dùng cho nghiệp vụ thanh toán tổng hợp rabbitMQ , và tính phí hoa hồng Commissition HTTP
         public async Task UpsertCommissionAsync(AgentCommissionMongo data)
         {
             // Sử dụng ReplaceOne với IsUpsert = true

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace MongoDBCore.Entities.Models
 {
+    [BsonIgnoreExtraElements]
     public class AgentDto
     {
         [BsonId]

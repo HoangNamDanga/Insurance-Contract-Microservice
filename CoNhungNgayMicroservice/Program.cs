@@ -212,7 +212,7 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<PolicyCreatedConsumer>();
     x.AddConsumer<InsuranceTypeCreateConsumer>(); // Thêm dòng này cho Insurance
     x.AddConsumer<AgentCreatedConsumer>(); // Thêm dòng này cho Insurance
-
+    x.AddConsumer<CommissionSyncConsumer>(); // Đăng ký Consumer đồng bộ hoa hồng
     x.AddConsumer<PolicyExpiredConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL nhắc phí
     x.AddConsumer<PolicyPaymentDueConsumer>(); // ĐĂNG KÝ THÊM CONSUMER GỬI MAIL TÍNH PHÍ
     x.UsingRabbitMq((context, cfg) =>
@@ -264,6 +264,13 @@ builder.Services.AddMassTransit(x =>
         cfg.ReceiveEndpoint("policy-payment-due-queue", e =>
         {
             e.ConfigureConsumer<PolicyPaymentDueConsumer>(context);
+        });
+
+        // --- THÊM ENDPOINT MỚI: Đồng bộ hoa hồng sang MongoDB ---
+        cfg.ReceiveEndpoint("commission-sync-queue", e =>
+        {
+            // Thiết lập Consumer này nghe từ hàng đợi commission-sync-queue
+            e.ConfigureConsumer<CommissionSyncConsumer>(context);
         });
     });
 });

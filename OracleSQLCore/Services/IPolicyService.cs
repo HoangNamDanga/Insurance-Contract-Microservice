@@ -31,5 +31,8 @@ namespace OracleSQLCore.Services
 
         // Hàm gọi URL HTTP POST sang hệ thống MongoDB , nghiệp vụ hoa hồng commisstion
         Task<CommissionSyncDto> ConfirmAndGetCommissionAsync(int policyId);
+
+        //Nghiep vu tong hop thanh toan
+        Task<PaymentConfirmedEvent> ConfirmPaymentAsync(int paymentId);
     }
 }
