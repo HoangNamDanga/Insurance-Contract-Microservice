@@ -12,8 +12,7 @@ using System.Threading.Tasks;
 namespace Insurance.Tests
 {
     //Ci/CD kiểu Integration Test : Loại viết test cho lớp logic Database
-<<<<<<< Updated upstream
-=======
+
     // Test
     //cần chạy để đảm bảo SQL và Trigger hoạt động đúng trước khi push.
     //hàm Integration Test (có Skip): Nó LIỆT KÊ vào danh sách nhưng KHÔNG CHẠY nội dung bên trong
@@ -22,18 +21,14 @@ namespace Insurance.Tests
     // Quá trình này test bằng thủ công bằng tay, vì trên git không có môi trường database, skip đẻ bỏ qua hàm này vì nó đã đc chạy dưới local của mình rồi
     //sự phối hợp giữa Local Test và CI/CD tự động
     // Chú ý : [Fact(Skip)] nghĩa là bỏ qua sau khi push lên git CI/CD tự động để tránh lỗi. Để Fact khi muốn test dưới local, sau đó lại [Fact(Skip)] khi đẩy lên git khi đã pass
->>>>>>> Stashed changes
+
     public class ClaimRepositoryTests
     {
         // Chú ý: Dùng Connection String tới Docker Oracle đang chạy trên máy bạn (cổng 1522)
         private readonly string _connectionString = "User Id=system;Password=mypassword123;Data Source=localhost:1522/XEPDB1";
 
-<<<<<<< Updated upstream
-        [Fact]
-=======
         [Fact(Skip = "Confirmed locally. Skip for CI/CD pass.")]
         //[Fact]
->>>>>>> Stashed changes
         public async Task AddClaimAsync_ShouldInsertData_AndReturnValidGeneratedId()
         {
             // 1. Arrange: Khởi tạo Repository và dữ liệu mẫu

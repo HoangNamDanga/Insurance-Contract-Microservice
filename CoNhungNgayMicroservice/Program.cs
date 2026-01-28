@@ -19,6 +19,7 @@ using OracleSQLCore.Repositories.BackgroundServices;
 using System.Data;
 using OracleSQLCore.Repositories.Email;
 using Shared.Contracts.Email;
+using MongoDBCore.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +95,23 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 #endregion
 
 #endregion
+
+
+#region SIGNALR
+
+builder.Services.AddSignalR();
+// Bắt buộc phải có để Frontend (React/Angular) có thể kết nối được
+builder.Services.AddCors(options => {
+    options.AddPolicy("SignalRPolicy", policy => {
+        policy.AllowAnyHeader()
+              .AllowAnyMethod()
+              .SetIsOriginAllowed(_ => true) // Quan trọng cho file://
+              .AllowCredentials();
+    });
+});
+
+#endregion
+
 
 #region Oracle DI, Service + Repo
 // ===== Oracle DI =====
@@ -218,7 +236,7 @@ builder.Services.AddMassTransit(x =>
     x.UsingRabbitMq((context, cfg) =>
     {
         // THÊM DÒNG NÀY: Áp d?ng cho m?i Endpoint bên d??i
-        cfg.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+        cfg.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5))); //. Nếu Mongo bị lag 1-2 giây, MassTransit sẽ không làm mất tin nhắn mà sẽ thử lại.
 
         cfg.Host("rabbitmq", "/", h =>
         {
@@ -316,7 +334,21 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
+#region SignalR
+// --- 5. MIDDLEWARE ---
+// Sử dụng CORS đã định nghĩa ở trên
+app.UseCors("SignalRPolicy");
 
+// Map đường dẫn cho Hub
+// Client sẽ kết nối tới: http://localhost:PORT/notificationHub
+//Trong code Frontend, hãy đảm bảo bạn gọi đúng địa chỉ /notificationHub như đã map ở bước 5
+// Map đường dẫn cho Hub
+// Client sẽ kết nối tới: http://localhost:PORT/notificationHub
+app.MapHub<NotificationHub>("/notificationHub");
+
+app.MapGet("/", () => "MongoDB Service & SignalR Hub is running...");
+
+#endregion
 
 
 #region Kích hoạt Endpoints , Cấu hình Middleware Pipeline
@@ -324,6 +356,6 @@ app.MapGraphQL(); // request HTTP POST gửi đến đây, engine GraphQL sẽ n
 app.MapGrpcService<CoNhungNgayMicroservice.Services.PolicyGrpcService>(); // Thiết lập một Endpoint để xử lý các request gRPC (HTTP/2 binary) gửi đến Server. Nó kết nối file .proto với logic thực tế trong class PolicyGrpcService
 
 // Thêm dòng này để hỗ trợ gọi gRPC từ các công cụ cũ hoặc trình duyệt (nếu cần)
-app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client."); // một Middleware xử lý yêu cầu GET đơn giản tại trang chủ. Nó đóng vai trò như một "biển báo" để nhắc nhở người dùng rằng họ đang truy cập vào một Server gRPC.
+app.MapGet("/grpc-info", () => "Communication with gRPC endpoints must be made through a gRPC client."); // một Middleware xử lý yêu cầu GET đơn giản tại trang chủ. Nó đóng vai trò như một "biển báo" để nhắc nhở người dùng rằng họ đang truy cập vào một Server gRPC.
 #endregion
 app.Run();

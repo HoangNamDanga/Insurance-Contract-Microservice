@@ -10,5 +10,7 @@ namespace MongoDBCore.Interfaces
     public interface ICommissionRepository
     {
         Task UpsertCommissionAsync(AgentCommissionMongo data);
+
+        Task UpsertCommissionAsync(CommissionMongo data);
     }
 }

@@ -8,7 +8,7 @@ services:
     image: hoangnamdang/insurance:latest
     container_name: conhungngay-api
     ports:
-      - "8080:8080" # Swagger/REST
+      - "8080:8080" # Swagger/REST API & SignalR Hub
       - "8081:8081" # gRPC
     depends_on:
       oracle:
@@ -25,11 +25,16 @@ services:
       - TZ=Asia/Ho_Chi_Minh
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
-      - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
-      - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1
-      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
-      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2
       
+      # ===== KESTREL ENDPOINTS =====
+      - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
+      - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1AndHttp2 # Cho phép SignalR dùng WebSockets/Http1
+      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
+      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2 # Bắt buộc cho gRPC
+
+      # ===== SIGNALR / CORS =====
+      - Frontend_Url=http://localhost:3000
+
       # ===== EMAIL SETTINGS =====
       - EmailSettings__SmtpServer=mailhog
       - EmailSettings__SmtpPort=1025
@@ -48,6 +53,7 @@ services:
       - MongoDBSettings__PolicyCollectionName=Policy
       - MongoDBSettings__CommissionsCollectionName=Commissions
       - MongoDBSettings__ClaimsCollectionName=Claims
+      - MongoDBSettings__PaymentsCollectionName=Payments
 
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
