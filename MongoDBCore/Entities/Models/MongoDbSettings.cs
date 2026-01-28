@@ -25,5 +25,7 @@ namespace MongoDBCore.Entities.Models
 
         public string CommissionsCollectionName { get; set; } = null!;
         public string ClaimsCollectionName { get; set; } = null!;
+
+        public string PaymentsCollectionName { get; set; } = null!;
     }
 }

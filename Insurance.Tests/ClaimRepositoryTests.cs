@@ -28,7 +28,9 @@ namespace Insurance.Tests
         private readonly string _connectionString = "User Id=system;Password=mypassword123;Data Source=localhost:1522/XEPDB1";
 
 
+
         [Fact(Skip = "Vi test nay can ket noi den Oracle Docker that, tam thoi skip de CI/CD pass")]
+
 
         public async Task AddClaimAsync_ShouldInsertData_AndReturnValidGeneratedId()
         {
