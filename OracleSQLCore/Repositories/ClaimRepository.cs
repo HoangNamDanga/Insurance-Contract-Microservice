@@ -70,5 +70,39 @@ namespace OracleSQLCore.Repositories
                 return await connection.QueryFirstOrDefaultAsync<ClaimSyncDto>(sql, new { ClaimId = claimId });
             }
         }
+
+
+        //Nghiệp vụ Duyệt/Từ chối bồi thường (Approve/Reject)
+        public async Task<bool> UpdateClaimStatusAsync(int claimId, string status, decimal? amountApproved, string description)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("p_claim_id", claimId, DbType.Int32, ParameterDirection.Input);
+            parameters.Add("p_status", status, DbType.String, ParameterDirection.Input);
+            parameters.Add("p_amount_approved", amountApproved ?? 0, DbType.Decimal, ParameterDirection.Input);
+            parameters.Add("p_description", description, DbType.String, ParameterDirection.Input);
+
+            // Sửa lỗi chính tả: p_out_success
+            parameters.Add("p_out_success", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+            using (var connection = new OracleConnection(_connectionString))
+            {
+                try
+                {
+                    await connection.ExecuteAsync(
+                        "INSURANCE_USER.PKG_CLAIM_MANAGEMENT.PRC_APPROVE_REJECT_CLAIM",
+                        parameters,
+                        commandType: CommandType.StoredProcedure);
+
+                    // Lấy giá trị sau khi Execute
+                    int success = parameters.Get<int>("p_out_success");
+                    return success == 1;
+                }
+                catch (OracleException ex)
+                {
+                    // Bắt đúng các lỗi RAISE_APPLICATION_ERROR từ Oracle Package
+                    throw new Exception($"Lỗi nghiệp vụ Database: {ex.Message}");
+                }
+            }
+        }
     }
 }
