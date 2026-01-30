@@ -11,3 +11,7 @@ obj/
 # OS files
 Thumbs.db
 desktop.ini
+
+# Draw.io Backups
+*.bkp
+.*.bkp
