@@ -1,6 +1,7 @@
 ﻿using Oracle.ManagedDataAccess.Client;
 using OracleSQLCore.Interface;
 using OracleSQLCore.Models.DTOs;
+using OracleSQLCore.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +20,34 @@ namespace OracleSQLCore.Services.Imp
         {
             _claimRepo = claimRepo;
             _httpClientFactory = httpClientFactory;
+        }
+
+
+        //Thủ tục Duyệt hoặc Từ chối bồi thường
+        public async Task<(bool IsSuccess, string Message)> ProcessClaimStatusAsync(int claimId, string status, decimal? amountApproved, string note)
+        {
+            try
+            {
+                // 1. Cập nhật Oracle thông qua Repository
+                bool isUpdated = await _claimRepo.UpdateClaimStatusAsync(claimId, status, amountApproved, note);
+
+                if (isUpdated)
+                {
+                    // 2. Lấy dữ liệu để đồng bộ (Lấy data phẳng từ Oracle)
+                    var syncDto = await _claimRepo.GetClaimForSyncAsync(claimId);
+
+                    // 3. Đồng bộ HTTP sang MongoDB Service
+                    await SyncToMongoAsync(syncDto);
+
+                    return (true, "Cập nhật trạng thái và đồng bộ thành công.");
+                }
+                return (false, "Không thể cập nhật trạng thái hồ sơ.");
+            }
+            catch (Exception ex)
+            {
+                // Trả về thông báo lỗi nghiệp vụ từ Oracle (ví dụ: "Số tiền duyệt quá lớn")
+                return (false, ex.Message);
+            }
         }
 
         #region Nghiệp vụ Quản lý Bồi thường (Claims Management) Validate trigger

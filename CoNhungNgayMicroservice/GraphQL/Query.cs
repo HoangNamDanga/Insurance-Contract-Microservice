@@ -21,5 +21,13 @@ namespace CoNhungNgayMicroservice.GraphQL
             // Repository này đã tự xử lý logic lấy từ Redis hay MongoDB rồi!
             return await repository.GetByIdAsync(id);
         }
+
+
+        public async Task<ClaimSyncDto?> GetClaimById(
+            int id, [Service] IClaimRepository repository)
+        {
+            // Khi gọi hàm này, nó sẽ: Check Redis -> Nếu hụt thì check Mongo -> Lưu Redis -> Trả về
+            return await repository.GetByIdAsync(id);
+        }
     }
 }

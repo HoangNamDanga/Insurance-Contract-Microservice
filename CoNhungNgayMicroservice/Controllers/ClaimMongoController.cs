@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MongoDBCore.Entities.Models;
 using MongoDBCore.Interfaces;
+using MongoDBCore.Services;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -10,25 +11,37 @@ namespace CoNhungNgayMicroservice.Controllers
     public class ClaimMongoController : ControllerBase
     {
         private readonly IClaimRepository _repo;
+        private readonly ICacheService _cache;
 
-        public ClaimMongoController(IClaimRepository repo)
+        public ClaimMongoController(IClaimRepository repo, ICacheService cache)
         {
             _repo = repo;
+            _cache = cache;
         }
 
         [HttpPost("sync-from-oracle")]
-        public async Task<IActionResult> SyncClaim([FromBody] ClaimSyncDto dto) // mongoDB dùng cách của mongoDB để hứng dữ liệu nên chỗ này mang giá trị của mongoDB, Oracle chỉ gửi sang Json
+        public async Task<IActionResult> SyncClaim([FromBody] ClaimSyncDto dto)
         {
             if (dto == null) return BadRequest("Dữ liệu đồng bộ trống.");
 
             try
             {
+                // 1. Ghi vào MongoDB (Source of Truth cho phần Read)
                 await _repo.UpsertClaimAsync(dto);
-                return Ok(new { message = "Đồng bộ dữ liệu bồi thường thành công!" });
+
+                // 2. Làm mới Redis Cache
+                // Chúng ta xóa key cũ để lần Query tiếp theo từ GraphQL sẽ vào Mongo lấy data mới nhất
+                string cacheKey = $"claim:{dto.ClaimId}";
+                await _cache.RemoveAsync(cacheKey);
+
+                // Hoặc chuyên nghiệp hơn: Ghi đè trực tiếp vào Redis để GraphQL không cần chạm vào Mongo nữa
+                // await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(30));
+
+                return Ok(new { message = "Đồng bộ dữ liệu bồi thường và làm mới Cache thành công!" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Lỗi lưu trữ MongoDB: {ex.Message}");
+                return StatusCode(500, $"Lỗi lưu trữ MongoDB/Cache: {ex.Message}");
             }
         }
 

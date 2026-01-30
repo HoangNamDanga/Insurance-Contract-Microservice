@@ -73,27 +73,5 @@ namespace MongoDBCore.Repositories.Consumer
         }
         //nếu chạy trên docker: Nếu frontend nằm ở một domain khác (hoặc port khác), phải cấu hình CORS trong Program.cs để cho phép trình duyệt kết nối vào Hub này, nếu không kết nối Real-time sẽ bị chặn (Refused)
 
-        /*
-         * 
-         * // 1. Thêm SignalR
-            builder.Services.AddSignalR();
-
-            // 2. Cấu hình CORS (BẮT BUỘC để Frontend kết nối được)
-            builder.Services.AddCors(options => {
-                options.AddPolicy("SignalRPolicy", policy => {
-                    policy.AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .WithOrigins("http://localhost:3000") // URL của Frontend (React/Angular/Vue)
-                          .AllowCredentials(); // Bắt buộc cho SignalR
-                });
-            });
-
-            var app = builder.Build();
-
-            app.UseCors("SignalRPolicy");
-
-            // 3. Map Hub
-            app.MapHub<NotificationHub>("/notificationHub");
-         * */
     }
 }
