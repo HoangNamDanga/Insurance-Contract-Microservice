@@ -16,7 +16,7 @@ namespace Insurance.Tests
         // Kết nối tới DB thật (Docker Oracle)
         private readonly string _connectionString = "User Id=system;Password=mypassword123;Data Source=localhost:1522/XEPDB1";
 
-        [Fact]
+        [Fact(Skip = "Yêu cầu Oracle Docker chạy cục bộ")]
         public async Task UpdateClaimStatusAsync_WhenValidApproved_ShouldReturnTrueAndUpdateDb()
         {
             // 1. Arrange: Khởi tạo Repository và dữ liệu mẫu
@@ -56,7 +56,7 @@ namespace Insurance.Tests
             }
         }
 
-        [Fact]
+        [Fact(Skip = "Yêu cầu Oracle Docker chạy cục bộ")]
         public async Task UpdateClaimStatusAsync_WhenClaimAlreadyProcessed_ShouldThrowException()
         {
             // 1. Arrange: Tạo một Claim và xử lý nó về trạng thái REJECTED trước
