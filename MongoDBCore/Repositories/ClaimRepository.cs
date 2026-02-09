@@ -52,13 +52,17 @@ namespace MongoDBCore.Repositories
         public async Task UpsertClaimAsync(ClaimSyncDto claimDoc)
         {
             var filter = Builders<ClaimSyncDto>.Filter.Eq(x => x.ClaimId, claimDoc.ClaimId);
-
-            // 1. Lưu vào MongoDB
             await _claimsCollection.ReplaceOneAsync(filter, claimDoc, new ReplaceOptions { IsUpsert = true });
 
-            // 2. XÓA CACHE CŨ (Rất quan trọng)
-            // Nếu không xóa, người dùng sẽ thấy dữ liệu cũ từ Redis thay vì dữ liệu mới vừa cập nhật
-            await _cache.RemoveAsync($"claim:{claimDoc.ClaimId}");
+            try
+            {
+                await _cache.SetAsync($"claim:{claimDoc.ClaimId}", claimDoc, TimeSpan.FromMinutes(30));
+            }
+            catch (Exception ex)
+            {
+                // Chỉ log lỗi Redis, không làm dừng luồng chính vì DB đã lưu xong
+                Console.WriteLine($"Lỗi cập nhật Cache: {ex.Message}");
+            }
         }
     }
 }

@@ -61,5 +61,27 @@ namespace CoNhungNgayMicroservice.Controllers
             // Nếu thất bại (do lỗi nghiệp vụ Oracle như: duyệt quá tiền, hợp đồng hết hạn...)
             return BadRequest(new { message = result.Message });
         }
+
+
+        /// <summary>
+        /// Hủy yêu cầu bồi thường (Chỉ áp dụng cho hồ sơ PENDING)
+        /// </summary>
+        [HttpPatch("cancel")]
+        public async Task<IActionResult> CancelClaim([FromBody] ClaimCancelRequest request)
+        {
+            if (request == null || request.ClaimId <= 0)
+                return BadRequest("Thông tin yêu cầu không hợp lệ.");
+
+            // Gọi Service để thực hiện: Oracle (Procedure) -> Sync MongoDB
+            var result = await _claimService.CancelClaimAsync(request.ClaimId, request.Reason);
+
+            if (result.IsSuccess)
+            {
+                return Ok(new { message = result.Message });
+            }
+
+            // Trả về lỗi nếu hồ sơ không ở trạng thái PENDING hoặc lỗi hệ thống
+            return BadRequest(new { message = result.Message });
+        }
     }
 }

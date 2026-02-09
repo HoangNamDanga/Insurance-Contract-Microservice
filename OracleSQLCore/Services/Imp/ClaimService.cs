@@ -22,6 +22,34 @@ namespace OracleSQLCore.Services.Imp
             _httpClientFactory = httpClientFactory;
         }
 
+        public async Task<(bool IsSuccess, string Message)> CancelClaimAsync(int claimId, string reason)
+        {
+            try
+            {
+                // 1. Gọi Repository để chạy Procedure PRC_CANCEL_CLAIM trong Oracle
+                bool isCancelled = await _claimRepo.CancelClaimAsync(claimId, reason);
+
+                if (isCancelled)
+                {
+                    // 2. Lấy dữ liệu mới nhất (vừa chuyển sang CANCELLED) để đồng bộ
+                    var syncDto = await _claimRepo.GetClaimForSyncAsync(claimId);
+
+                    // 3. Đồng bộ sang MongoDB Service qua HTTP
+                    // Điều này đảm bảo bên Mongo trạng thái cũng chuyển sang 'CANCELLED'
+                    await SyncToMongoAsync(syncDto);
+
+                    return (true, "Hủy yêu cầu bồi thường và đồng bộ thành công.");
+                }
+
+                return (false, "Không thể hủy hồ sơ. Có thể hồ sơ không ở trạng thái Chờ (PENDING).");
+            }
+            catch (Exception ex)
+            {
+                // Log lỗi nếu cần
+                return (false, $"Lỗi hệ thống khi hủy hồ sơ: {ex.Message}");
+            }
+        }
+
 
         //Thủ tục Duyệt hoặc Từ chối bồi thường
         public async Task<(bool IsSuccess, string Message)> ProcessClaimStatusAsync(int claimId, string status, decimal? amountApproved, string note)

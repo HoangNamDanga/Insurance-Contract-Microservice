@@ -47,6 +47,30 @@ namespace OracleSQLCore.Repositories
             }
         }
 
+        //3. Nghiệp vụ Hủy yêu cầu (Cancel Claim)
+        public async Task<bool> CancelClaimAsync(int claimId, string reason)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("p_claim_id", claimId, DbType.Int32, ParameterDirection.Input);
+
+            // Sử dụng tham số truyền vào từ Interface
+            parameters.Add("p_reason", reason ?? "No reason provided", DbType.String, ParameterDirection.Input);
+
+            parameters.Add("p_out_success", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+            using (var connection = new OracleConnection(_connectionString))
+            {
+                // Gọi Store Procedure trong Package
+                await connection.ExecuteAsync(
+                    "INSURANCE_USER.PKG_CLAIM_MANAGEMENT.PRC_CANCEL_CLAIM",
+                    parameters,
+                    commandType: CommandType.StoredProcedure);
+
+                int result = parameters.Get<int>("p_out_success");
+                return result == 1;
+            }
+        }
+
         //Hàm raw vẽ dữ liệu ... làm giàu dữ liệu để đồng bộ sang mongoDb
         public async Task<ClaimSyncDto> GetClaimForSyncAsync(int claimId)
         {

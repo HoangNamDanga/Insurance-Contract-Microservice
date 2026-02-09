@@ -23,27 +23,18 @@ namespace CoNhungNgayMicroservice.Controllers
         public async Task<IActionResult> SyncClaim([FromBody] ClaimSyncDto dto)
         {
             if (dto == null) return BadRequest("Dữ liệu đồng bộ trống.");
-
             try
             {
-                // 1. Ghi vào MongoDB (Source of Truth cho phần Read)
+                // Chỉ cần gọi Repo, mọi việc ghi DB và làm mới Cache đã được đóng gói bên trong
                 await _repo.UpsertClaimAsync(dto);
-
-                // 2. Làm mới Redis Cache
-                // Chúng ta xóa key cũ để lần Query tiếp theo từ GraphQL sẽ vào Mongo lấy data mới nhất
-                string cacheKey = $"claim:{dto.ClaimId}";
-                await _cache.RemoveAsync(cacheKey);
-
-                // Hoặc chuyên nghiệp hơn: Ghi đè trực tiếp vào Redis để GraphQL không cần chạm vào Mongo nữa
-                // await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(30));
-
-                return Ok(new { message = "Đồng bộ dữ liệu bồi thường và làm mới Cache thành công!" });
+                return Ok(new { message = "Đồng bộ và làm mới Cache thành công!" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Lỗi lưu trữ MongoDB/Cache: {ex.Message}");
+                return StatusCode(500, $"Lỗi: {ex.Message}");
             }
         }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetClaimById(int id)

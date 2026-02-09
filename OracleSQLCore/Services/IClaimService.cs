@@ -15,5 +15,9 @@ namespace OracleSQLCore.Services
 
         // Nghiệp vụ mới: Duyệt hoặc từ chối bồi thường
         Task<(bool IsSuccess, string Message)> ProcessClaimStatusAsync(int claimId, string status, decimal? amountApproved, string note);
+
+
+        //Hủy yêu cầu bồi thường
+        Task<(bool IsSuccess, string Message)> CancelClaimAsync(int claimId, string reason);
     }
 }
