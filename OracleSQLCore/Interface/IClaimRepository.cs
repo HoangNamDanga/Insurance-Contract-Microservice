@@ -25,6 +25,6 @@ namespace OracleSQLCore.Interface
 
         // 4. Nghiệp vụ Tính tổng tiền đã yêu cầu bồi thường (Calculate Total Claimed Amount)
         // Phục vụ kiểm tra hạn mức của hợp đồng (Policy Limit)
-        //Task<decimal> GetTotalClaimedAmountByPolicyIdAsync(int policyId);
+        Task<decimal> GetTotalClaimedAmountByPolicyIdAsync(int policyId);
     }
 }

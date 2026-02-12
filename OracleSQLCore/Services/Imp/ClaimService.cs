@@ -50,6 +50,23 @@ namespace OracleSQLCore.Services.Imp
             }
         }
 
+        public async Task<decimal> GetTotalClaimedAmountByPolicyIdAsync(int policyId)
+        {
+            try
+            {
+                // Gọi Repo để lấy con số tổng từ Oracle
+                var total = await _claimRepo.GetTotalClaimedAmountByPolicyIdAsync(policyId);
+
+                return total;
+            }
+            catch (Exception ex)
+            {
+                // Log lỗi tại đây (ví dụ: _logger.LogError(ex, "..."))
+                // Trả về 0 để tránh làm lỗi giao diện người dùng (UI Dashboard)
+                return 0;
+            }
+        }
+
 
         //Thủ tục Duyệt hoặc Từ chối bồi thường
         public async Task<(bool IsSuccess, string Message)> ProcessClaimStatusAsync(int claimId, string status, decimal? amountApproved, string note)

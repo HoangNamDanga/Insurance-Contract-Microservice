@@ -16,6 +16,46 @@ namespace Insurance.Tests
         // Kết nối tới DB thật (Docker Oracle)
         private readonly string _connectionString = "User Id=system;Password=mypassword123;Data Source=localhost:1522/XEPDB1";
 
+
+        [Fact(Skip = "Yêu cầu Oracle Docker chạy cục bộ")]
+        //[Fact]
+        public async Task GetTotalClaimedAmountByPolicyIdAsync_ShouldReturnCorrectSum_ExcludingCancelled()
+        {
+            //1. Arrange: Khoi tao Repo va chuan bi 2 Claim cho cung 1 Policy
+            var repository = new ClaimRepository(_connectionString);
+            int policyId = 28;
+
+            //Tao 2 ban ghi
+            // Tạo 2 bản ghi tạm thời
+            int claimId1 = await CreateTestClaimDirectly(policyId, 1000000); // 1 triệu
+            int claimId2 = await CreateTestClaimDirectly(policyId, 2000000); // 2 triệu
+
+            try
+            {
+                //2. Act: Goi ham tinh tong tu Repository
+                decimal total = await repository.GetTotalClaimedAmountByPolicyIdAsync(policyId);
+
+                // 3. Assert: Kiem tra tong (Phai it nhat la 3 trieu tu 2 ban ghi moi tao)
+                total.Should().BeGreaterThanOrEqualTo(3000000);
+
+                // 4. Kiểm chứng logic loại bỏ hồ sơ CANCELLED
+                // Thử hủy 1 hồ sơ
+                await repository.CancelClaimAsync(claimId1, "Hủy để test tính tổng");
+
+                decimal totalAfterCancel = await repository.GetTotalClaimedAmountByPolicyIdAsync(policyId);
+
+                // Tổng mới phải giảm đi đúng 1 triệu của hồ sơ vừa hủy
+                totalAfterCancel.Should().Be(total - 1000000);
+            }
+            finally
+            {
+                // Cleanup
+                await DeleteTestClaim(claimId1);
+                await DeleteTestClaim(claimId2);
+            }
+        }
+
+        //[Fact]
         [Fact(Skip = "Yêu cầu Oracle Docker chạy cục bộ")]
         public async Task UpdateClaimStatusAsync_WhenValidApproved_ShouldReturnTrueAndUpdateDb()
         {
@@ -55,7 +95,7 @@ namespace Insurance.Tests
                 await DeleteTestClaim(testClaimId);
             }
         }
-
+        //[Fact]
         [Fact(Skip = "Yêu cầu Oracle Docker chạy cục bộ")]
         public async Task UpdateClaimStatusAsync_WhenClaimAlreadyProcessed_ShouldThrowException()
         {
@@ -103,12 +143,39 @@ namespace Insurance.Tests
             return p.Get<int>("v_generated_claim_id");
         }
 
+        private async Task<int> CreateTestClaimDirectly(int policyId = 28, decimal amount = 2000000)
+        {
+            using var conn = new OracleConnection(_connectionString);
+            var p = new DynamicParameters();
+            p.Add("v_policy_id", policyId);
+            p.Add("v_amount", amount);
+            p.Add("v_desc", "Data for testing aggregation");
+            p.Add("v_generated_claim_id", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+            await conn.ExecuteAsync(
+                @"INSERT INTO INSURANCE_USER.DHN_CLAIM (POLICY_ID, AMOUNT_CLAIMED, DESCRIPTION, STATUS) 
+          VALUES (:v_policy_id, :v_amount, :v_desc, 'PENDING') 
+          RETURNING CLAIM_ID INTO :v_generated_claim_id", p);
+
+            return p.Get<int>("v_generated_claim_id");
+        }
+
 
 
         private async Task DeleteTestClaim(int claimId)
         {
             using var conn = new OracleConnection(_connectionString);
-            await conn.ExecuteAsync("DELETE FROM INSURANCE_USER.DHN_CLAIM WHERE CLAIM_ID = :Id", new { Id = claimId });
+            await conn.OpenAsync(); // Đảm bảo connection đã mở
+
+            // PHẢI xóa History trước
+            await conn.ExecuteAsync(
+                "DELETE FROM INSURANCE_USER.DHN_CLAIM_HISTORY WHERE CLAIM_ID = :Id",
+                new { Id = claimId });
+
+            // Sau đó mới xóa Claim
+            await conn.ExecuteAsync(
+                "DELETE FROM INSURANCE_USER.DHN_CLAIM WHERE CLAIM_ID = :Id",
+                new { Id = claimId });
         }
     }
 }

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -95,6 +96,25 @@ namespace OracleSQLCore.Repositories
             }
         }
 
+        public async Task<decimal> GetTotalClaimedAmountByPolicyIdAsync(int policyId)
+        {
+            using var conn = new OracleConnection(_connectionString);
+            var p = new DynamicParameters();
+
+            //Dau vao
+            p.Add("p_policy_id", policyId, DbType.Int32, ParameterDirection.Input);
+
+            //Dau ra
+            p.Add("p_total_amount", dbType: DbType.Decimal, direction: ParameterDirection.Output);
+
+            await conn.ExecuteAsync(
+                "INSURANCE_USER.PKG_CLAIM_MANAGEMENT.PRC_GET_TOTAL_CLAIMED",
+                p,
+            commandType: CommandType.StoredProcedure);
+
+            return p.Get<decimal>("p_total_amount");
+        }
+
 
         //Nghiệp vụ Duyệt/Từ chối bồi thường (Approve/Reject)
         public async Task<bool> UpdateClaimStatusAsync(int claimId, string status, decimal? amountApproved, string description)
@@ -104,8 +124,6 @@ namespace OracleSQLCore.Repositories
             parameters.Add("p_status", status, DbType.String, ParameterDirection.Input);
             parameters.Add("p_amount_approved", amountApproved ?? 0, DbType.Decimal, ParameterDirection.Input);
             parameters.Add("p_description", description, DbType.String, ParameterDirection.Input);
-
-            // Sửa lỗi chính tả: p_out_success
             parameters.Add("p_out_success", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
             using (var connection = new OracleConnection(_connectionString))
@@ -117,13 +135,19 @@ namespace OracleSQLCore.Repositories
                         parameters,
                         commandType: CommandType.StoredProcedure);
 
-                    // Lấy giá trị sau khi Execute
                     int success = parameters.Get<int>("p_out_success");
-                    return success == 1;
+
+                    // THAY ĐỔI Ở ĐÂY: Nếu không thành công, hãy chủ động quăng lỗi
+                    if (success == 0)
+                    {
+                        throw new Exception("Loi: Yeu cau boi thuong nay da duoc xu ly truoc do!");
+                    }
+
+                    return true;
                 }
                 catch (OracleException ex)
                 {
-                    // Bắt đúng các lỗi RAISE_APPLICATION_ERROR từ Oracle Package
+                    // Trường hợp Oracle bắn lỗi trực tiếp qua RAISE_APPLICATION_ERROR
                     throw new Exception($"Lỗi nghiệp vụ Database: {ex.Message}");
                 }
             }

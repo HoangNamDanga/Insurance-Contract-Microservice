@@ -65,6 +65,9 @@ namespace CoNhungNgayMicroservice.Controllers
 
         /// <summary>
         /// Hủy yêu cầu bồi thường (Chỉ áp dụng cho hồ sơ PENDING)
+        /// Chỉ thay đổi 1 hoặc vài field
+        /// Muốn tiết kiệm băng thông
+        /// Không muốn ghi đè toàn bộ tài nguyên
         /// </summary>
         [HttpPatch("cancel")]
         public async Task<IActionResult> CancelClaim([FromBody] ClaimCancelRequest request)
@@ -82,6 +85,13 @@ namespace CoNhungNgayMicroservice.Controllers
 
             // Trả về lỗi nếu hồ sơ không ở trạng thái PENDING hoặc lỗi hệ thống
             return BadRequest(new { message = result.Message });
+        }
+
+        [HttpGet("total-claimed/{policyId}")]
+        public async Task<IActionResult> GetTotal(int policyId)
+        {
+            var total = await _claimService.GetTotalClaimedAmountByPolicyIdAsync(policyId);
+            return Ok(new { PolicyId = policyId, TotalAmount = total });
         }
     }
 }

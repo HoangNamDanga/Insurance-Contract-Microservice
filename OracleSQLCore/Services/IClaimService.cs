@@ -19,5 +19,8 @@ namespace OracleSQLCore.Services
 
         //Hủy yêu cầu bồi thường
         Task<(bool IsSuccess, string Message)> CancelClaimAsync(int claimId, string reason);
+
+        // Nghiệp vụ 4: Lấy tổng số tiền đã yêu cầu bồi thường theo Policy
+        Task<decimal> GetTotalClaimedAmountByPolicyIdAsync(int policyId);
     }
 }
