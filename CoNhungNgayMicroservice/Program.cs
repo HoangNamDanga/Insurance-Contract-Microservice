@@ -132,15 +132,28 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IClaimRepository>(
     _ => new OracleSQLCore.Repositories.ClaimRepository(oracleConnectionString)
 );
 
+builder.Services.AddScoped<OracleSQLCore.Interface.IPaymentRepository>(
+    _ => new OracleSQLCore.Repositories.PaymentRepository(oracleConnectionString)
+);
+
+
+builder.Services.AddScoped<OracleSQLCore.Interface.IClaimDocumentRepository>(
+    _ => new OracleSQLCore.Repositories.ClaimDocumentRepository(oracleConnectionString)
+);
+builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
+    new AgentRepository(oracleConnectionString!));
+
 
 
 builder.Services.AddScoped<OracleSQLCore.Services.ICustomerService, CustomerService>();
 builder.Services.AddScoped<IInsuranceTypeService, InsuranceTypeService>();
-builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
-    new AgentRepository(oracleConnectionString!));
 builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<IClaimDocumentService, ClaimDocumentService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+
 #endregion
 // End
 // ??ng ký cho MongoDB
@@ -152,6 +165,10 @@ builder.Services.AddScoped<MongoDBCore.Interfaces.IAgentRepository, MongoDBCore.
 builder.Services.AddScoped<MongoDBCore.Services.ICustomerService, MongoDBCore.Services.Imp.CustomerService>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IInsuranceRepository, MongoDBCore.Repositories.InsuranceTypeRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IClaimRepository, MongoDBCore.Repositories.ClaimRepository>();
+builder.Services.AddScoped<MongoDBCore.Interfaces.IClaimDocumentRepository, MongoDBCore.Repositories.ClaimDocumentRepository>();
+builder.Services.AddScoped<MongoDBCore.Interfaces.IPaymentRepository, MongoDBCore.Repositories.PaymentRepository>();
+
+
 builder.Services.AddSingleton<IMongoClient>(
     _ => new MongoClient(mongoConnectionString)
 );
@@ -225,6 +242,8 @@ builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u có th? thì s? là
 builder.Services.AddMassTransit(x =>
 {
     // --- ??NG KÝ CÁC CONSUMER ---
+    x.AddConsumer<PaymentCreatedConsumer>();
+    x.AddConsumer<PaymentStatusUpdatedConsumer>();
     x.AddConsumer<PolicyChangedConsumer>();
     x.AddConsumer<CustomerCreatedConsumer>();
     x.AddConsumer<PolicyCreatedConsumer>();
@@ -290,6 +309,17 @@ builder.Services.AddMassTransit(x =>
             // Thiết lập Consumer này nghe từ hàng đợi commission-sync-queue
             e.ConfigureConsumer<CommissionSyncConsumer>(context);
         });
+
+
+        // 2 consumer dùng chung cho nghiệp vụ thanh toán bên thứ 3 gọi api
+        cfg.ReceiveEndpoint("payment-mongo-sync-queue", e =>
+        {
+            // Cấu hình PrefetchCount để tránh bị ngợp tin nhắn nếu có hàng nghìn giao dịch
+            e.PrefetchCount = 16;
+
+            e.ConfigureConsumer<PaymentCreatedConsumer>(context);
+            e.ConfigureConsumer<PaymentStatusUpdatedConsumer>(context);
+        });
     });
 });
 #endregion
@@ -328,6 +358,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+#region cấu hình dành cho các file tĩnh . để ASP .NET Core cho phép xem các file trong thư mục wwwroot 
+app.UseStaticFiles(); //// Cho phép truy cập file qua link: http://localhost:port/uploads/claim-documents/ten-file.pdf
+#endregion
+
+
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
@@ -349,6 +385,8 @@ app.MapHub<NotificationHub>("/notificationHub");
 app.MapGet("/", () => "MongoDB Service & SignalR Hub is running...");
 
 #endregion
+
+
 
 
 #region Kích hoạt Endpoints , Cấu hình Middleware Pipeline

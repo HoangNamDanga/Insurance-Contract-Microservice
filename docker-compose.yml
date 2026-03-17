@@ -10,6 +10,8 @@ services:
     ports:
       - "8080:8080" # Swagger/REST API & SignalR Hub
       - "8081:8081" # gRPC
+    volumes:
+      - ./CoNhungNgayMicroservice/wwwroot/uploads:/app/wwwroot/uploads
     depends_on:
       oracle:
         condition: service_healthy
@@ -21,16 +23,22 @@ services:
         condition: service_started
       mailhog: 
         condition: service_started
+      mockbank: # Thêm dependency để đảm bảo bank chạy trước api
+        condition: service_started
     environment:
       - TZ=Asia/Ho_Chi_Minh
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
       
+      # ===== BANK SETTINGS (NEW) =====
+      # Đây là địa chỉ dự án Oracle gọi sang Bank trong mạng Docker
+      - BankSettings__ApiUrl=http://mockbank:8080/api/mockbank/process
+      
       # ===== KESTREL ENDPOINTS =====
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
-      - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1AndHttp2 # Cho phép SignalR dùng WebSockets/Http1
+      - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1AndHttp2 
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
-      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2 # Bắt buộc cho gRPC
+      - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2 
 
       # ===== SIGNALR / CORS =====
       - Frontend_Url=http://localhost:3000
@@ -54,6 +62,7 @@ services:
       - MongoDBSettings__CommissionsCollectionName=Commissions
       - MongoDBSettings__ClaimsCollectionName=Claims
       - MongoDBSettings__PaymentsCollectionName=Payments
+      - MongoDBSettings__ClaimDocumentsCollectionName=ClaimDocuments
 
       # ===== ORACLE =====
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
@@ -64,6 +73,22 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
 
+    networks:
+      - backend
+
+  # ===== MOCK BANK SERVICE (NEW) =====
+  mockbank:
+    build:
+      context: ../MockBank.API # Trỏ ra ngoài để tìm dự án Bank
+      dockerfile: Dockerfile
+    container_name: mockbank
+    ports:
+      - "5005:8080" # Port để bạn gọi thử từ máy thật (Postman)
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - TZ=Asia/Ho_Chi_Minh
+      # Địa chỉ Bank gọi ngược lại API của bạn (conhungngay-api là container_name)
+      - CallbackSettings__Url=http://conhungngay-api:8080/api/payment/callback
     networks:
       - backend
 

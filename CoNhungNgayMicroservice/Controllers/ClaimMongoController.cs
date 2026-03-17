@@ -11,12 +11,10 @@ namespace CoNhungNgayMicroservice.Controllers
     public class ClaimMongoController : ControllerBase
     {
         private readonly IClaimRepository _repo;
-        private readonly ICacheService _cache;
 
-        public ClaimMongoController(IClaimRepository repo, ICacheService cache)
+        public ClaimMongoController(IClaimRepository repo)
         {
             _repo = repo;
-            _cache = cache;
         }
 
         [HttpPost("sync-from-oracle")]
