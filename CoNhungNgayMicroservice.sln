@@ -19,8 +19,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Contracts", "Shared.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Insurance.Tests", "Insurance.Tests\Insurance.Tests.csproj", "{08665D96-FF84-4345-AD68-5A258EA4EDD5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MockBank.API", "..\MockBank.API\MockBank.API.csproj", "{325F29B0-B87F-0F30-79D6-7EA139B020D9}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,10 +45,6 @@ Global
 		{08665D96-FF84-4345-AD68-5A258EA4EDD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{08665D96-FF84-4345-AD68-5A258EA4EDD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{08665D96-FF84-4345-AD68-5A258EA4EDD5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{325F29B0-B87F-0F30-79D6-7EA139B020D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{325F29B0-B87F-0F30-79D6-7EA139B020D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{325F29B0-B87F-0F30-79D6-7EA139B020D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{325F29B0-B87F-0F30-79D6-7EA139B020D9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
