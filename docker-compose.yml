@@ -3,13 +3,15 @@ version: "3.9"
 services:
   api:
     build:
+      # QUAN TRỌNG: Nhảy ra ngoài thư mục Persional để thấy các project Core/Shared
       context: .
-      dockerfile: Dockerfile
+      # Trỏ chính xác vào Dockerfile nằm trong thư mục API
+      dockerfile: Dockerfile 
     image: hoangnamdang/insurance:latest
     container_name: conhungngay-api
     ports:
-      - "8080:8080" # Swagger/REST API & SignalR Hub
-      - "8081:8081" # gRPC
+      - "8080:8080" 
+      - "8081:8081" 
     volumes:
       - ./CoNhungNgayMicroservice/wwwroot/uploads:/app/wwwroot/uploads
     depends_on:
@@ -23,36 +25,23 @@ services:
         condition: service_started
       mailhog: 
         condition: service_started
-      mockbank: # Thêm dependency để đảm bảo bank chạy trước api
+      mockbank: 
         condition: service_started
     environment:
       - TZ=Asia/Ho_Chi_Minh
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;http://+:8081
-      
-      # ===== BANK SETTINGS (NEW) =====
-      # Đây là địa chỉ dự án Oracle gọi sang Bank trong mạng Docker
       - BankSettings__ApiUrl=http://mockbank:8080/api/mockbank/process
-      
-      # ===== KESTREL ENDPOINTS =====
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__URL=http://+:8080
       - ASPNETCORE_KESTREL__ENDPOINTS__REST__PROTOCOLS=Http1AndHttp2 
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__URL=http://+:8081
       - ASPNETCORE_KESTREL__ENDPOINTS__GRPC__PROTOCOLS=Http2 
-
-      # ===== SIGNALR / CORS =====
       - Frontend_Url=http://localhost:3000
-
-      # ===== EMAIL SETTINGS =====
       - EmailSettings__SmtpServer=mailhog
       - EmailSettings__SmtpPort=1025
       - EmailSettings__SenderName=Bao Hiem Co Nhung Ngay
       - EmailSettings__SenderEmail=no-reply@conhungngay.com
-
-      # ===== REDIS =====
       - Redis__ConnectionString=redis:6379,password=myredispw123
-
-      # ===== MONGODB =====
       - MongoDBSettings__ConnectionString=mongodb://mongodb:27017
       - MongoDBSettings__DatabaseName=InsuranceDB
       - MongoDBSettings__CustomerCollectionName=Customers
@@ -63,35 +52,31 @@ services:
       - MongoDBSettings__ClaimsCollectionName=Claims
       - MongoDBSettings__PaymentsCollectionName=Payments
       - MongoDBSettings__ClaimDocumentsCollectionName=ClaimDocuments
-
-      # ===== ORACLE =====
+      - MongoDBSettings__VehiclesCollectionName=Vehicles # Sửa lại tên env cho chuẩn
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
-
-      # ===== RABBITMQ =====
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__Port=5672
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
-
     networks:
       - backend
 
-  # ===== MOCK BANK SERVICE (NEW) =====
   mockbank:
     build:
-      context: ../MockBank.API # Trỏ ra ngoài để tìm dự án Bank
-      dockerfile: Dockerfile
+      # QUAN TRỌNG: Nhảy ra thư mục Persional để thấy Shared.Contracts
+      context: .. 
+      dockerfile: MockBank.API/Dockerfile
     container_name: mockbank
     ports:
-      - "5005:8080" # Port để bạn gọi thử từ máy thật (Postman)
+      - "5005:8080" 
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - TZ=Asia/Ho_Chi_Minh
-      # Địa chỉ Bank gọi ngược lại API của bạn (conhungngay-api là container_name)
       - CallbackSettings__Url=http://conhungngay-api:8080/api/payment/callback
     networks:
       - backend
 
+  # ... Các service redis, mongodb, oracle, rabbitmq, mailhog giữ nguyên như cũ ...
   redis:
     image: redis:7-alpine
     container_name: redis

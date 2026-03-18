@@ -20,6 +20,7 @@ using System.Data;
 using OracleSQLCore.Repositories.Email;
 using Shared.Contracts.Email;
 using MongoDBCore.Hubs;
+using MongoSync.Service.Consumers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -140,6 +141,12 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IPaymentRepository>(
 builder.Services.AddScoped<OracleSQLCore.Interface.IClaimDocumentRepository>(
     _ => new OracleSQLCore.Repositories.ClaimDocumentRepository(oracleConnectionString)
 );
+
+builder.Services.AddScoped<OracleSQLCore.Interface.IVehicleRepository>(
+    _ => new OracleSQLCore.Repositories.VehicleRepository(oracleConnectionString)
+);
+
+
 builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
     new AgentRepository(oracleConnectionString!));
 
@@ -152,7 +159,7 @@ builder.Services.AddScoped<IClaimDocumentService, ClaimDocumentService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
-
+builder.Services.AddScoped<IVehicleService, VehicleService>();
 
 #endregion
 // End
@@ -167,7 +174,7 @@ builder.Services.AddScoped<MongoDBCore.Interfaces.IInsuranceRepository, MongoDBC
 builder.Services.AddScoped<MongoDBCore.Interfaces.IClaimRepository, MongoDBCore.Repositories.ClaimRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IClaimDocumentRepository, MongoDBCore.Repositories.ClaimDocumentRepository>();
 builder.Services.AddScoped<MongoDBCore.Interfaces.IPaymentRepository, MongoDBCore.Repositories.PaymentRepository>();
-
+builder.Services.AddScoped<MongoDBCore.Interfaces.IVehicleRepository, MongoDBCore.Repositories.VehicleRepository>();
 
 builder.Services.AddSingleton<IMongoClient>(
     _ => new MongoClient(mongoConnectionString)
@@ -242,6 +249,9 @@ builder.Services.AddSingleton<AsyncRetryPolicy>(sp => // n?u có th? thì s? là
 builder.Services.AddMassTransit(x =>
 {
     // --- ??NG KÝ CÁC CONSUMER ---
+    x.AddConsumer<VehicleCreatedConsumer>();
+    x.AddConsumer<VehicleDeletedConsumer>();
+    x.AddConsumer<VehicleUpdatedConsumer>();
     x.AddConsumer<PaymentCreatedConsumer>();
     x.AddConsumer<PaymentStatusUpdatedConsumer>();
     x.AddConsumer<PolicyChangedConsumer>();
@@ -319,6 +329,16 @@ builder.Services.AddMassTransit(x =>
 
             e.ConfigureConsumer<PaymentCreatedConsumer>(context);
             e.ConfigureConsumer<PaymentStatusUpdatedConsumer>(context);
+        });
+
+        cfg.ReceiveEndpoint("vehicle-mongo-sync-queue", e =>
+        {
+            // Cấu hình PrefetchCount để tránh bị ngợp tin nhắn nếu có hàng nghìn giao dịch
+            e.PrefetchCount = 16;
+
+            e.ConfigureConsumer<VehicleCreatedConsumer>(context);
+            e.ConfigureConsumer<VehicleDeletedConsumer>(context);
+            e.ConfigureConsumer<VehicleUpdatedConsumer>(context);
         });
     });
 });
