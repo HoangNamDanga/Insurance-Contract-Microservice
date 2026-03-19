@@ -53,6 +53,7 @@ services:
       - MongoDBSettings__PaymentsCollectionName=Payments
       - MongoDBSettings__ClaimDocumentsCollectionName=ClaimDocuments
       - MongoDBSettings__VehiclesCollectionName=Vehicles # Sửa lại tên env cho chuẩn
+      - MongoDBSettings__VehiclesCollectionName=PolicyBeneficiaries # Sửa lại tên env cho chuẩn
       - ConnectionStrings__OracleDbConnection=User Id=system;Password=mypassword123;Data Source=oracle:1521/XEPDB1
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__Port=5672

@@ -30,5 +30,7 @@ namespace MongoDBCore.Entities.Models
 
         public string ClaimDocumentsCollectionName { get; set; } = null!;
         public string VehicleDocumentsCollectionName { get; set; } = null!;
+
+        public string PolicyBeneficiariesCollectionName { get; set; } = null!;
     }
 }
