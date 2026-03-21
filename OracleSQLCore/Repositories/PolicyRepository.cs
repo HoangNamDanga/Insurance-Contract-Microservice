@@ -123,8 +123,11 @@ namespace OracleSQLCore.Repositories
         // --- HELPER: Hàm dùng chung để lấy tên Customer/Agent (Enrichment) ---
         private async Task<PolicyCreatedEvent> EnrichPolicyData(OracleConnection conn, int id, string action)
         {
-            // Bổ sung p.CUSTOMER_ID, p.AGENT_ID, p.INS_TYPE_ID vào SQL
-            string sql = @"
+            // LƯU Ý: Oracle mặc định bind tham số theo vị trí, dòng này giúp bind theo tên (:id)
+            conn.BindByName = true;
+
+            // 1. Lấy thông tin Policy + Vehicle (Single Row)
+            string sqlPolicy = @"
                 SELECT p.POLICY_ID as PolicyId, 
                        p.POLICY_NUMBER as PolicyNumber, 
                        p.STATUS as Status, 
@@ -136,20 +139,55 @@ namespace OracleSQLCore.Repositories
                        p.AGENT_ID as AgentId,          
                        a.FULL_NAME as AgentName,
                        p.INS_TYPE_ID as InsTypeId,     
-                       t.TYPE_NAME as InsTypeName
-                    FROM INSURANCE_USER.DHN_POLICY p
-                    JOIN INSURANCE_USER.DHN_CUSTOMER c ON p.CUSTOMER_ID = c.CUSTOMER_ID
-                    JOIN INSURANCE_USER.DHN_AGENT a ON p.AGENT_ID = a.AGENT_ID
-                    JOIN INSURANCE_USER.DHN_INSURANCE_TYPE t ON p.INS_TYPE_ID = t.INS_TYPE_ID
-                    WHERE p.POLICY_ID = :id";
+                       t.TYPE_NAME as InsTypeName,
+                       v.BRAND as Brand, 
+                       v.MODEL as Model
+                FROM INSURANCE_USER.DHN_POLICY p
+                JOIN INSURANCE_USER.DHN_CUSTOMER c ON p.CUSTOMER_ID = c.CUSTOMER_ID
+                JOIN INSURANCE_USER.DHN_AGENT a ON p.AGENT_ID = a.AGENT_ID
+                JOIN INSURANCE_USER.DHN_INSURANCE_TYPE t ON p.INS_TYPE_ID = t.INS_TYPE_ID
+                LEFT JOIN INSURANCE_USER.DHN_VEHICLE v ON p.POLICY_ID = v.POLICY_ID
+                WHERE p.POLICY_ID = :id";
 
-                    // Dapper sẽ tự động map các cột trên vào thuộc tính tương ứng của PolicyCreatedEvent
-                    var eventData = await conn.QuerySingleOrDefaultAsync<PolicyCreatedEvent>(sql, new { id });
+                    // 2. Lấy danh sách Claims (Multiple Rows)
+                    string sqlClaims = @"
+                SELECT CLAIM_ID as ClaimId, 
+                       AMOUNT_APPROVED as AmountApproved, 
+                       STATUS as Status 
+                FROM INSURANCE_USER.DHN_CLAIM 
+                WHERE POLICY_ID = :id AND STATUS = 'Approved'";
 
-                    if (eventData != null)
-                    {
-                        eventData.Action = action;
-                    }
+            // THỰC THI QUA 2 BƯỚC ĐỂ TRÁNH LỖI ORA-50028
+            var rawData = await conn.QuerySingleOrDefaultAsync<dynamic>(sqlPolicy, new { id });
+
+            if (rawData == null) return null;
+
+            var eventData = new PolicyCreatedEvent
+            {
+                // Khi dùng dynamic với Oracle, hãy dùng VIẾT HOA tên cột
+                PolicyId = (int)rawData.POLICYID,
+                PolicyNumber = rawData.POLICYNUMBER,
+                Status = rawData.STATUS,
+                PremiumAmount = (decimal)rawData.PREMIUMAMOUNT,
+                StartDate = (DateTime)rawData.STARTDATE,
+                EndDate = (DateTime)rawData.ENDDATE,
+                CustomerId = (int)rawData.CUSTOMERID,
+                CustomerName = rawData.CUSTOMERNAME,
+                AgentId = (int)rawData.AGENTID,
+                AgentName = rawData.AGENTNAME,
+                InsTypeId = (int)rawData.INSTYPEID,
+                InsTypeName = rawData.INSTYPENAME,
+                Action = action,
+                Vehicle = new VehicleInfo
+                {
+                    Brand = rawData.BRAND,
+                    Model = rawData.MODEL
+                }
+            };
+
+            // Lấy danh sách Claims
+            var claims = await conn.QueryAsync<ClaimInfo>(sqlClaims, new { id });
+            eventData.Claims = claims.ToList();
 
             return eventData;
         }

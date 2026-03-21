@@ -2,6 +2,7 @@
 using Oracle.ManagedDataAccess.Client;
 using OracleSQLCore.Interface;
 using OracleSQLCore.Models.DTOs;
+using Shared.Contracts.Events;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -9,6 +10,7 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Collections.Specialized.BitVector32;
 
 namespace OracleSQLCore.Repositories
 {
@@ -22,31 +24,33 @@ namespace OracleSQLCore.Repositories
         }
 
         //Chú ý khi làm việc vs oracle : phải có tên user chứa bảng đó để gọi dapper VD: INSURANCE_USER
-        public async Task<int> AddClaimAsync(ClaimCreateDto dto)
+        public async Task<PolicyCreatedEvent> AddClaimAsync(ClaimCreateDto dto)
         {
             // Bỏ phần tính MAX(ID) đi, để Oracle tự lo
-            var sql = @"
-                INSERT INTO INSURANCE_USER.DHN_CLAIM (POLICY_ID, CLAIM_DATE, AMOUNT_CLAIMED, STATUS, DESCRIPTION)
-                VALUES (:PolicyId, :ClaimDate, :AmountClaimed, 'Pending', :Description)
-                RETURNING CLAIM_ID INTO :newId";
-
             using (var connection = new OracleConnection(_connectionString))
             {
+                await connection.OpenAsync();
+
+                var sql = @"
+            INSERT INTO INSURANCE_USER.DHN_CLAIM 
+            (POLICY_ID, CLAIM_DATE, AMOUNT_CLAIMED, STATUS, AMOUNT_APPROVED, DESCRIPTION)
+            VALUES (:PolicyId, :ClaimDate, :AmountClaimed, 'Approved', :AmountClaimed, :Description)
+            RETURNING CLAIM_ID INTO :newId";
+
                 var parameters = new DynamicParameters();
                 parameters.Add("PolicyId", dto.PolicyId);
                 parameters.Add("ClaimDate", dto.ClaimDate);
                 parameters.Add("AmountClaimed", dto.AmountClaimed);
                 parameters.Add("Description", dto.Description);
-
-                // Đây là nơi nhận ID về
-                parameters.Add("newId", dbType: DbType.Int32, direction: ParameterDirection.Output, size: 38);
+                parameters.Add("newId", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
                 await connection.ExecuteAsync(sql, parameters);
 
-                // Trả về ID thực tế vừa sinh ra
-                return parameters.Get<int>("newId");
+                // Trả về "Snapshot" mới nhất của toàn bộ Hợp đồng
+                return await EnrichPolicyData(connection, dto.PolicyId, "UPDATE");
             }
         }
+
 
         //3. Nghiệp vụ Hủy yêu cầu (Cancel Claim)
         public async Task<bool> CancelClaimAsync(int claimId, string reason)
@@ -151,6 +155,103 @@ namespace OracleSQLCore.Repositories
                     throw new Exception($"Lỗi nghiệp vụ Database: {ex.Message}");
                 }
             }
+        }
+
+        public async Task<int> GetPolicyIdByClaimId(int claimId)
+        {
+            using (var connection = new OracleConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                // Truy vấn đơn giản để lấy ID hợp đồng từ bảng bồi thường
+                var sql = "SELECT POLICY_ID FROM INSURANCE_USER.DHN_CLAIM WHERE CLAIM_ID = :claimId";
+                return await connection.QuerySingleAsync<int>(sql, new { claimId });
+            }
+        }
+
+        // 1. Hàm PUBLIC - Dùng để Service gọi từ bên ngoài
+        public async Task<PolicyCreatedEvent> EnrichPolicyData(int id, string action)
+        {
+            using (var connection = new OracleConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                // Truyền biến 'connection' vào hàm xử lý lõi
+                return await EnrichPolicyData(connection, id, action);
+            }
+        }
+
+
+        // 2. Hàm PRIVATE - Chứa logic SQL, dùng nội bộ trong Repository
+        private async Task<PolicyCreatedEvent> EnrichPolicyData(OracleConnection connection, int id, string action)
+        {
+            connection.BindByName = true;
+
+            // 1. SQL Policy: Phải JOIN để lấy được Tên khách hàng, Tên đại lý, Tên loại bảo hiểm
+            string sqlPolicy = @"
+        SELECT p.POLICY_ID as PolicyId, 
+               p.POLICY_NUMBER as PolicyNumber, 
+               p.PREMIUM_AMOUNT as PremiumAmount,
+               p.START_DATE as StartDate,
+               p.END_DATE as EndDate,
+               p.STATUS as Status,
+               p.CUSTOMER_ID as CustomerId,
+               p.AGENT_ID as AgentId,
+               p.INS_TYPE_ID as InsTypeId,
+               cust.FULL_NAME as CustomerName,  -- Cần JOIN để có cột này
+               age.FULL_NAME as AgentName,     -- Cần JOIN để có cột này
+               typ.TYPE_NAME as InsTypeName,   -- Cần JOIN để có cột này
+               v.BRAND, 
+               v.MODEL 
+                FROM INSURANCE_USER.DHN_POLICY p 
+                INNER JOIN INSURANCE_USER.DHN_CUSTOMER cust ON p.CUSTOMER_ID = cust.CUSTOMER_ID
+                INNER JOIN INSURANCE_USER.DHN_AGENT age ON p.AGENT_ID = age.AGENT_ID
+                INNER JOIN INSURANCE_USER.DHN_INSURANCE_TYPE typ ON p.INS_TYPE_ID = typ.INS_TYPE_ID
+                LEFT JOIN INSURANCE_USER.DHN_VEHICLE v ON p.POLICY_ID = v.POLICY_ID 
+                WHERE p.POLICY_ID = :id";
+
+                    // 2. SQL Claims: Lấy danh sách các hồ sơ bồi thường đã duyệt
+                    string sqlClaims = @"
+                SELECT CLAIM_ID as ClaimId, 
+                       AMOUNT_APPROVED as AmountApproved, 
+                       STATUS 
+                FROM INSURANCE_USER.DHN_CLAIM 
+                WHERE POLICY_ID = :id AND STATUS = 'Approved'";
+
+            // Thực thi query chính
+            var rawData = await connection.QuerySingleOrDefaultAsync<dynamic>(sqlPolicy, new { id });
+            if (rawData == null) return null;
+
+            // 3. Mapping dữ liệu (Dùng Convert để an toàn với kiểu dữ liệu Oracle)
+            var eventData = new PolicyCreatedEvent
+            {
+                PolicyId = Convert.ToInt32(rawData.POLICYID),
+                PolicyNumber = rawData.POLICYNUMBER?.ToString(),
+                CustomerId = Convert.ToInt32(rawData.CUSTOMERID),
+                AgentId = Convert.ToInt32(rawData.AGENTID),
+                InsTypeId = Convert.ToInt32(rawData.INSTYPEID),
+
+                // Gán các trường Tên đã JOIN ở trên
+                CustomerName = rawData.CUSTOMERNAME?.ToString(),
+                AgentName = rawData.AGENTNAME?.ToString(),
+                InsTypeName = rawData.INSTYPENAME?.ToString(),
+
+                PremiumAmount = Convert.ToDecimal(rawData.PREMIUMAMOUNT),
+                StartDate = Convert.ToDateTime(rawData.STARTDATE),
+                EndDate = Convert.ToDateTime(rawData.ENDDATE),
+                Status = rawData.STATUS?.ToString(),
+                Action = action,
+
+                Vehicle = new VehicleInfo
+                {
+                    Brand = rawData.BRAND?.ToString(),
+                    Model = rawData.MODEL?.ToString()
+                }
+            };
+
+            // 4. Lấy mảng Claims
+            var claims = await connection.QueryAsync<ClaimInfo>(sqlClaims, new { id });
+            eventData.Claims = claims.ToList();
+
+            return eventData;
         }
     }
 }

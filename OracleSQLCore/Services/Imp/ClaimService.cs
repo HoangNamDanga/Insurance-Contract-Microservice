@@ -1,7 +1,9 @@
-﻿using Oracle.ManagedDataAccess.Client;
+﻿using Dapper;
+using Oracle.ManagedDataAccess.Client;
 using OracleSQLCore.Interface;
 using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Repositories;
+using Shared.Contracts.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,27 +28,28 @@ namespace OracleSQLCore.Services.Imp
         {
             try
             {
-                // 1. Gọi Repository để chạy Procedure PRC_CANCEL_CLAIM trong Oracle
+                // 1. Chạy Procedure hủy trong Oracle
                 bool isCancelled = await _claimRepo.CancelClaimAsync(claimId, reason);
 
                 if (isCancelled)
                 {
-                    // 2. Lấy dữ liệu mới nhất (vừa chuyển sang CANCELLED) để đồng bộ
-                    var syncDto = await _claimRepo.GetClaimForSyncAsync(claimId);
+                    // 2. Lấy PolicyId thuộc về Claim này (Bạn cần viết thêm hàm này trong Repo)
+                    int policyId = await _claimRepo.GetPolicyIdByClaimId(claimId);
 
-                    // 3. Đồng bộ sang MongoDB Service qua HTTP
-                    // Điều này đảm bảo bên Mongo trạng thái cũng chuyển sang 'CANCELLED'
-                    await SyncToMongoAsync(syncDto);
+                    // 3. Làm giàu lại toàn bộ Hợp đồng (Mảng Claims lúc này sẽ cập nhật trạng thái mới)
+                    var enrichedPolicy = await _claimRepo.EnrichPolicyData(policyId, "UPDATE");
 
-                    return (true, "Hủy yêu cầu bồi thường và đồng bộ thành công.");
+                    // 4. Đồng bộ Snapshot mới nhất sang Mongo
+                    await SyncToMongoAsync(enrichedPolicy);
+
+                    return (true, "Hủy yêu cầu bồi thường và cập nhật báo cáo thành công.");
                 }
 
-                return (false, "Không thể hủy hồ sơ. Có thể hồ sơ không ở trạng thái Chờ (PENDING).");
+                return (false, "Không thể hủy hồ sơ. Có thể hồ sơ không ở trạng thái PENDING.");
             }
             catch (Exception ex)
             {
-                // Log lỗi nếu cần
-                return (false, $"Lỗi hệ thống khi hủy hồ sơ: {ex.Message}");
+                return (false, $"Lỗi hệ thống: {ex.Message}");
             }
         }
 
@@ -73,24 +76,26 @@ namespace OracleSQLCore.Services.Imp
         {
             try
             {
-                // 1. Cập nhật Oracle thông qua Repository
+                // 1. Cập nhật Oracle
                 bool isUpdated = await _claimRepo.UpdateClaimStatusAsync(claimId, status, amountApproved, note);
 
                 if (isUpdated)
                 {
-                    // 2. Lấy dữ liệu để đồng bộ (Lấy data phẳng từ Oracle)
-                    var syncDto = await _claimRepo.GetClaimForSyncAsync(claimId);
+                    // 2. Lấy PolicyId để làm giàu dữ liệu
+                    int policyId = await _claimRepo.GetPolicyIdByClaimId(claimId);
 
-                    // 3. Đồng bộ HTTP sang MongoDB Service
-                    await SyncToMongoAsync(syncDto);
+                    // 3. Lấy Snapshot mới (Hàm Enrich sẽ sum lại số tiền bồi thường mới nhất)
+                    var enrichedPolicy = await _claimRepo.EnrichPolicyData(policyId, "UPDATE");
 
-                    return (true, "Cập nhật trạng thái và đồng bộ thành công.");
+                    // 4. Đồng bộ sang MongoDB
+                    await SyncToMongoAsync(enrichedPolicy);
+
+                    return (true, "Cập nhật trạng thái và đồng bộ báo cáo thành công.");
                 }
                 return (false, "Không thể cập nhật trạng thái hồ sơ.");
             }
             catch (Exception ex)
             {
-                // Trả về thông báo lỗi nghiệp vụ từ Oracle (ví dụ: "Số tiền duyệt quá lớn")
                 return (false, ex.Message);
             }
         }
@@ -100,32 +105,53 @@ namespace OracleSQLCore.Services.Imp
         {
             try
             {
-                //1. Lưu vào Oracle (Trigger TRG_CHECK_CLAIM_VALID) sẽ chạy ở đây
-                int newClaimId = await _claimRepo.AddClaimAsync(dto);
+                // 2. Gọi Repo: Truyền thông tin tạo Claim vào
+                // Repo sẽ trả về "Snapshot" đầy đủ của Hợp đồng sau khi đã chèn Claim thành công
+                var enrichedPolicy = await _claimRepo.AddClaimAsync(dto);
 
-                //2. làm giàu dữ liệu để chuẩn bị đồng bộ
-                var synDto = await _claimRepo.GetClaimForSyncAsync(newClaimId);
+                // 3. Đồng bộ: Gửi nguyên "Snapshot" sang Mongo
+                await SyncToMongoAsync(enrichedPolicy);
 
-                //3. Đồng bộ sang MongoDb (gửi gói tin sang Microservices Mongo)
-                await SyncToMongoAsync(synDto);
-
-                return (true, "Yêu cầu bồi thường đã được tạo và đồng bộ thành công .", newClaimId);
-            }catch(OracleException ex) when (ex.Number >= 2000 && ex.Number <= 20999)
+                // 4. Trả về cho User
+                return (true, "Bồi thường thành công và báo cáo đã cập nhật.", enrichedPolicy.PolicyId);
+            }
+            catch (OracleException ex) when (ex.Number >= 20000 && ex.Number <= 20999)
             {
-                //Bắt các lỗi nghiệp vụ từ RAISE_APPLICATION_ERRO Trong Trigger
-                return (false, $"Vi phạm nghiệp vụ bảo hiểm : {ex.Message}", null);
+                return (false, $"Lỗi nghiệp vụ: {ex.Message}", null);
             }
         }
 
-        private async Task SyncToMongoAsync(ClaimSyncDto dto)
-        {
-            var client = _httpClientFactory.CreateClient("MongoSyncClient");
-            var response = await client.PostAsJsonAsync("http://api:8080/api/ClaimMongo/sync-from-oracle", dto);
 
-            if (!response.IsSuccessStatusCode)
+
+        // 1. Đổi tham số thành PolicyCreatedEvent
+        private async Task SyncToMongoAsync(PolicyCreatedEvent fullPolicyData)
+        {
+            try
             {
-                //Trong thực tế, có thể ghi log vào bảng "Sync_Retry" nếu có bảng, hoặc tọa thêm nếu cần quản lý
-                Console.WriteLine("Cảnh báo : Đồng bộ sang MongoDb thất bại.");
+                // 1. Lấy Client đã có sẵn Retry & Circuit Breaker từ Polly
+                var client = _httpClientFactory.CreateClient("MongoSyncClient");
+
+
+                // Đường dẫn đầy đủ sẽ là: http://api:8080/api/ClaimMongo/sync-from-oraclee
+                var response = await client.PostAsJsonAsync("api/ClaimMongo/sync-from-oraclee", fullPolicyData);
+
+                // 3. Xử lý kết quả
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Đọc nội dung lỗi từ phía MongoDB để dễ debug
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[Sync Error] {response.StatusCode}: {errorContent}");
+                }
+                else
+                {
+                    Console.WriteLine($"[Sync Success] Đã đồng bộ Policy {fullPolicyData.PolicyId} sang MongoDB.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Nếu rơi vào đây nghĩa là Polly đã Retry hết số lần cho phép 
+                // hoặc Circuit Breaker đang ở trạng thái Open (Ngắt mạch)
+                Console.WriteLine($"[System Error] Không thể đồng bộ sau khi đã Retry: {ex.Message}");
             }
         }
 

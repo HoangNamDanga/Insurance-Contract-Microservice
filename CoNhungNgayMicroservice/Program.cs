@@ -21,10 +21,18 @@ using OracleSQLCore.Repositories.Email;
 using Shared.Contracts.Email;
 using MongoDBCore.Hubs;
 using MongoSync.Service.Consumers;
+using MongoDBCore.Interfaces;
+using MongoDBCore.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        // Tắt cơ chế tự động trả về 400 Bad Request của [ApiController]
+        // Điều này cho phép request lọt vào Controller ngay cả khi Model có lỗi Validation
+        options.SuppressModelStateInvalidFilter = true;
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -151,8 +159,8 @@ builder.Services.AddScoped<OracleSQLCore.Interface.IPolicyBeneficiaryRepository>
 );
 
 
-builder.Services.AddScoped<IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
-    new AgentRepository(oracleConnectionString!));
+builder.Services.AddScoped<OracleSQLCore.Interface.IAgentRepository>(sp => // S? d?ng Factory ?? truy?n string vào Constructor, g?i là Factory Registration
+    new OracleSQLCore.Repositories.AgentRepository(oracleConnectionString!));
 
 
 
@@ -165,6 +173,7 @@ builder.Services.AddScoped<IClaimService, ClaimService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<IPolicyBeneficiaryService, PolicyBeneficiaryService>();
+builder.Services.AddScoped<IPolicyReportingRepository, PolicyReportingRepository>();
 #endregion
 // End
 // ??ng ký cho MongoDB
@@ -218,11 +227,14 @@ var circuitBreaker = HttpPolicyExtensions // c?ng b?t cùng các lo?i l?i nh? re
     .CircuitBreakerAsync(
         handledEventsAllowedBeforeBreaking: 5, // n?u có 5 yêu c?u liên ti?p (sau khi retry xong) v?n lõi -> Circuit s? OPEN => ?? 1 request = ?ã retry xong m?i tính
         durationOfBreak: TimeSpan.FromSeconds(30)); // trong 30 giây m?i request không g?i HTTP, Không retry, Fail Ngay
-
-builder.Services.AddHttpClient("MongoSyncClient") // // g?n polly vào client -> CreateClient("MongoSyncClient") ? t? ??ng có retry
-    .AddPolicyHandler(retryPolicy) // m?i request g?i ?i -> retry theo retryPolicy
-    .AddPolicyHandler(circuitBreaker); // N?u l?i nhi?u -> circuit breaker qu?n lý
-// Chú ý th? t? trong Pollyu r?t quan tr?ng. Retry tr??c -> Circuit breaker sau -> ?ây là th? t? ?úng
+builder.Services.AddHttpClient("MongoSyncClient", client =>
+{
+    // PHẢI LÀ 'api' vì đó là tên service trong docker-compose
+    client.BaseAddress = new Uri("http://api:8080/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddPolicyHandler(retryPolicy)
+.AddPolicyHandler(circuitBreaker);
 
 #endregion
 

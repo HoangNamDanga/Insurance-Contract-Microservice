@@ -55,9 +55,17 @@ namespace MongoDBCore.Repositories
 
         public async Task UpsertAsync(PolicyDto policytDto)
         {
-            var filter = Builders<PolicyDto>.Filter.Eq(x => x.PolicyId , policytDto.PolicyId);
-            await _policiesCollection.ReplaceOneAsync(filter, policytDto, new ReplaceOptions {  IsUpsert = true });
+            // Logic vẫn vậy, nhưng object policytDto bây giờ đã có thêm mảng Claims và Vehicle
+            var filter = Builders<PolicyDto>.Filter.Eq(x => x.PolicyId, policytDto.PolicyId);
+
+            // ReplaceOneAsync sẽ ghi đè toàn bộ Document cũ bằng Document mới có đầy đủ thông tin lồng nhau
+            await _policiesCollection.ReplaceOneAsync(filter, policytDto, new ReplaceOptions { IsUpsert = true });
         }
+
+
+
+
+
 
 
         //Gia han hop dong va huy hop dong

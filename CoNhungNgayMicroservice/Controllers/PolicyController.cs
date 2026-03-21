@@ -5,6 +5,7 @@ using MongoDBCore.Interfaces;
 using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Repositories.BackgroundServices;
 using OracleSQLCore.Services;
+using Shared.Contracts.Events;
 using System.Data;
 using System.Net.Http;
 
@@ -42,15 +43,14 @@ namespace CoNhungNgayMicroservice.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] PolicyDto dto)
+        public async Task<IActionResult> Create([FromBody] OracleSQLCore.Models.DTOs.PolicyDto dto)
         {
-            // Service sẽ lo việc: Ghi Oracle -> Enrich Data -> Publish RabbitMQ (with Retry)
             var result = await _policyService.CreateAsync(dto);
             return Ok(result);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] PolicyDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] OracleSQLCore.Models.DTOs.PolicyDto dto)
         {
             dto.PolicyId = id;
             var result = await _policyService.UpdateAsync(dto);
@@ -242,6 +242,9 @@ namespace CoNhungNgayMicroservice.Controllers
                 return StatusCode(500, $"Lỗi hệ thống: {ex.Message}");
             }
         }
+
+
+
 
 
 

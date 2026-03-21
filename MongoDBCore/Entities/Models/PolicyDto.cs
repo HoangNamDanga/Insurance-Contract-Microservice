@@ -1,32 +1,46 @@
 ﻿using MongoDB.Bson.Serialization.Attributes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MongoDBCore.Entities.Models
+public class PolicyDto
 {
-    public class PolicyDto
+    [BsonId]
+    public int PolicyId { get; set; }
+
+    // Thêm [BsonIgnoreIfNull] để nếu Oracle không gửi trường này, 
+    // Mongo sẽ không lưu trường đó vào DB thay vì lưu giá trị null.
+    [BsonIgnoreIfNull]
+    public string? PolicyNumber { get; set; }
+
+    public int CustomerId { get; set; }
+    public int AgentId { get; set; }
+    public int InsTypeId { get; set; }
+
+    public string? CustomerName { get; set; }
+    public string? AgentName { get; set; }
+    public string? InsTypeName { get; set; }
+
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public decimal PremiumAmount { get; set; }
+    public string? Status { get; set; }
+
+    // QUAN TRỌNG: Gán giá trị mặc định để tránh lỗi null reference khi xử lý logic
+    public VehicleInfo Vehicle { get; set; } = new VehicleInfo();
+    public List<ClaimInfo> Claims { get; set; } = new List<ClaimInfo>();
+
+    public class VehicleInfo
     {
-        [BsonId] // Sử dụng ID từ Oracle làm khóa chính luôn
-        public int PolicyId { get; set; }
+        // Cho phép null và báo cho MongoDB biết là có thể bỏ qua nếu null
+        [BsonIgnoreIfNull]
+        public string? Brand { get; set; }
 
-        public string PolicyNumber { get; set; }
+        [BsonIgnoreIfNull]
+        public string? Model { get; set; }
+    }
 
-        // Các trường ID (vẫn giữ để đối soát nếu cần)
-        public int CustomerId { get; set; }
-        public int AgentId { get; set; }
-        public int InsTypeId { get; set; }
-
-        // CÁC TRƯỜNG "HỨNG" TỪ EVENT (Quan trọng để hiển thị)
-        public string CustomerName { get; set; }
-        public string AgentName { get; set; }
-        public string InsTypeName { get; set; }
-
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
-        public decimal PremiumAmount { get; set; }
-        public string Status { get; set; }
+    public class ClaimInfo
+    {
+        public int ClaimId { get; set; }
+        public decimal AmountApproved { get; set; }
+        public string? Status { get; set; }
     }
 }

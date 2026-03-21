@@ -1,4 +1,5 @@
 ﻿using MongoDBCore.Entities.Models;
+using Shared.Contracts.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,5 +18,7 @@ namespace MongoDBCore.Interfaces
 
         // Thêm hàm để sửu dụng cache , khi xóa 1 thằng thì đảm bảo dữ liệu bị xóa ở mọi nơi
         //Task<bool> DeleteAsync(int claimId)
+
+        Task UpsertPolicySnapshotAsync(PolicyCreatedEvent dto);
     }
 }

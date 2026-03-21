@@ -27,22 +27,38 @@ namespace MongoDBCore.Repositories.Consumer
             {
                 PolicyId = eventData.PolicyId,
                 PolicyNumber = eventData.PolicyNumber,
-                CustomerId = eventData.CustomerId,     // Bây giờ sẽ hết lỗi nếu đã thêm vào Event
-                AgentId = eventData.AgentId,           // Thêm vào Event luôn nhé
-                InsTypeId = eventData.InsTypeId,       // Thêm vào Event luôn nhé
+                CustomerId = eventData.CustomerId,
+                AgentId = eventData.AgentId,
+                InsTypeId = eventData.InsTypeId,
                 CustomerName = eventData.CustomerName,
                 AgentName = eventData.AgentName,
                 InsTypeName = eventData.InsTypeName,
                 StartDate = eventData.StartDate,
                 EndDate = eventData.EndDate,
                 PremiumAmount = eventData.PremiumAmount,
-                Status = eventData.Status
+                Status = eventData.Status,
+
+                // SỬA LỖI CS0029 TẠI ĐÂY: Khởi tạo đối tượng mới và gán từng field
+                Vehicle = eventData.Vehicle == null ? null : new PolicyDto.VehicleInfo
+                {
+                    Brand = eventData.Vehicle.Brand,
+                    Model = eventData.Vehicle.Model
+                },
+
+                // SỬA LỖI CS0029 CHO DANH SÁCH CLAIMS
+                Claims = eventData.Claims?.Select(c => new PolicyDto.ClaimInfo
+                {
+                    ClaimId = c.ClaimId,
+                    AmountApproved = c.AmountApproved,
+                    Status = c.Status
+                }).ToList() ?? new List<PolicyDto.ClaimInfo>()
             };
 
-            switch (eventData.Action.ToUpper()) //// field action cua Event, dc truyen tu` Controller Oracle
+            switch (eventData.Action?.ToUpper())
             {
                 case "CREATE":
                 case "UPDATE":
+                    // Hàm UpsertAsync lúc này sẽ nhận dto có đầy đủ Vehicle và Claims
                     await _policyRepository.UpsertAsync(dto);
                     break;
                 case "DELETE":

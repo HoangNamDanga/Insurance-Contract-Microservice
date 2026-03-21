@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDBCore.Entities.Models;
 using MongoDBCore.Interfaces;
 using MongoDBCore.Services;
+using Shared.Contracts.Events;
 
 namespace CoNhungNgayMicroservice.Controllers
 {
@@ -26,6 +27,24 @@ namespace CoNhungNgayMicroservice.Controllers
                 // Chỉ cần gọi Repo, mọi việc ghi DB và làm mới Cache đã được đóng gói bên trong
                 await _repo.UpsertClaimAsync(dto);
                 return Ok(new { message = "Đồng bộ và làm mới Cache thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi: {ex.Message}");
+            }
+        }
+
+
+
+        [HttpPost("sync-from-oraclee")]
+        public async Task<IActionResult> SyncPolicySnapshot([FromBody] PolicyCreatedEvent dto) // Đổi sang Event to
+        {
+            if (dto == null) return BadRequest("Dữ liệu đồng bộ trống.");
+            try
+            {
+                // Gọi hàm Upsert dành cho Policy thay vì chỉ mỗi Claim lẻ
+                await _repo.UpsertPolicySnapshotAsync(dto);
+                return Ok(new { message = "Đồng bộ Snapshot Hợp đồng thành công!" });
             }
             catch (Exception ex)
             {
