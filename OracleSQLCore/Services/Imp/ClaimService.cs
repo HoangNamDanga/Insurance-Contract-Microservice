@@ -105,15 +105,17 @@ namespace OracleSQLCore.Services.Imp
         {
             try
             {
-                // 2. Gọi Repo: Truyền thông tin tạo Claim vào
-                // Repo sẽ trả về "Snapshot" đầy đủ của Hợp đồng sau khi đã chèn Claim thành công
+                // Repo trả về nguyên Snapshot (Object)
                 var enrichedPolicy = await _claimRepo.AddClaimAsync(dto);
 
-                // 3. Đồng bộ: Gửi nguyên "Snapshot" sang Mongo
+                // Đồng bộ Snapshot sang Mongo
                 await SyncToMongoAsync(enrichedPolicy);
 
-                // 4. Trả về cho User
-                return (true, "Bồi thường thành công và báo cáo đã cập nhật.", enrichedPolicy.PolicyId);
+                // LẤY ID: Trong danh sách Claims của Snapshot, cái cuối cùng chính là cái vừa tạo
+                // Hoặc nếu trong Event bạn có trường ClaimId riêng thì dùng trường đó
+                int? lastClaimId = enrichedPolicy.Claims.OrderByDescending(c => c.ClaimId).FirstOrDefault()?.ClaimId;
+
+                return (true, "Bồi thường thành công.", lastClaimId);
             }
             catch (OracleException ex) when (ex.Number >= 20000 && ex.Number <= 20999)
             {

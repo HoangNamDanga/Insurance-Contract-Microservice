@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using FluentAssertions;
+using MassTransit;
 using Oracle.ManagedDataAccess.Client;
 using OracleSQLCore.Models.DTOs;
 using OracleSQLCore.Repositories;
@@ -31,39 +32,47 @@ namespace Insurance.Tests
 
         [Fact(Skip = "Vi test nay can ket noi den Oracle Docker that, tam thoi skip de CI/CD pass")]
 
-
         public async Task AddClaimAsync_ShouldInsertData_AndReturnValidGeneratedId()
         {
             // 1. Arrange: Khởi tạo Repository và dữ liệu mẫu
             var repository = new ClaimRepository(_connectionString);
             var testDto = new ClaimCreateDto
             {
-                PolicyId = 28, // Đảm bảo ID này tồn tại trong bảng Policy nếu có FK
+                PolicyId = 28, // Đảm bảo ID này tồn tại trong Oracle
                 ClaimDate = DateTime.Now,
                 AmountClaimed = 1500000,
                 Description = "Test bồi thường từ Unit Test"
             };
 
-            // 2. Act: Gọi hàm thực hiện insert
-            var newId = await repository.AddClaimAsync(testDto);
+            // 2. Act: Nhận kết quả là Snapshot (để phục vụ đồng bộ MongoDB)
+            var resultSnapshot = await repository.AddClaimAsync(testDto);
 
-            // 3. Assert: Kiểm tra ID trả về
-            newId.Should().BeGreaterThan(0, "Vì Trigger trong Oracle phải tự sinh ID dương");
+            // 3. Assert: Kiểm tra Snapshot trả về
+            resultSnapshot.Should().NotBeNull("Repo phải trả về thông tin hợp đồng sau khi thêm bồi thường");
 
-            // 4. Verify: Truy vấn trực tiếp vào DB để chắc chắn dữ liệu đã nằm trong bảng
+            // Trích xuất ID mới nhất từ danh sách Claims trong Snapshot
+            var newClaimId = resultSnapshot.Claims.Max(c => c.ClaimId);
+
+            newClaimId.Should().BeGreaterThan(0, "ID bồi thường phải là số dương được sinh tự động từ Oracle Trigger");
+
+            // 4. Verify: Truy vấn trực tiếp vào DB Oracle để kiểm tra tính toàn vẹn
             using var connection = new OracleConnection(_connectionString);
 
-            // Sử dụng kiểu IDictionary để tránh lỗi Dynamic null reference
-            var insertedClaim = await connection.QuerySingleOrDefaultAsync(
+            var queryResult = await connection.QuerySingleOrDefaultAsync(
                 "SELECT DESCRIPTION, STATUS FROM INSURANCE_USER.DHN_CLAIM WHERE CLAIM_ID = :Id",
-                new { Id = newId }) as IDictionary<string, object>;
+                new { Id = newClaimId }); // Đã sửa từ newId thành newClaimId
 
-            // Kiểm tra xem có tìm thấy bản ghi không
-            insertedClaim.Should().NotBeNull($"Không tìm thấy bản ghi với ID {newId} trong bảng DHN_CLAIM");
+            // Ép kiểu sang IDictionary để đọc dữ liệu động từ Oracle
+            var insertedClaim = queryResult as IDictionary<string, object>;
 
-            // Oracle thường trả về tên cột viết HOA TOÀN BỘ
-            insertedClaim["DESCRIPTION"].ToString().Should().Be(testDto.Description);
-            insertedClaim["STATUS"].ToString().Should().Be("Pending");
+            // Kiểm tra bản ghi có tồn tại trong DB không
+            insertedClaim.Should().NotBeNull($"Không tìm thấy bản ghi với ID {newClaimId} trong bảng DHN_CLAIM");
+
+            // Sử dụng toán tử ! và ?. để triệt tiêu Warning CS8602 (Nullability)
+            insertedClaim!["DESCRIPTION"]?.ToString().Should().Be(testDto.Description);
+
+            // So sánh Status (Chuyển ToUpper để tránh lệch Case chữ hoa/thường của DB)
+            insertedClaim!["STATUS"]?.ToString()?.ToUpper().Should().Be("PENDING");
         }
     }
 }
